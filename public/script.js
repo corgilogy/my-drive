@@ -2,13 +2,11 @@
 // 1. CẤU HÌNH
 // ==========================================
 const CONFIG = {
-  // URL lấy token (Chạy qua Backend Netlify)
-  GET_TOKEN_URL: "https://dnduc-drive.netlify.app/.netlify/functions/getToken",
+  // Link gọi Backend
+  GET_TOKEN_URL: "/.netlify/functions/getToken",
+  SAVE_DB_URL: "/.netlify/functions/saveFile",
 
-  // URL lưu DB
-  SAVE_DB_URL: "https://dnduc-drive.netlify.app/.netlify/functions/saveFile",
-
-  // ID thư mục
+  // ID thư mục bạn muốn lưu
   FOLDER_ID: "1i__DIWWEX7HYemtyZ5wqwaYcYfnW50a3",
 
   FIREBASE: {
@@ -25,26 +23,26 @@ const CONFIG = {
 };
 
 // ==========================================
-// 2. LOGIC CHƯƠNG TRÌNH
+// 2. KHỞI TẠO (Đã sửa lỗi null)
 // ==========================================
-
 document.addEventListener("DOMContentLoaded", () => {
+  // Khởi tạo Firebase
   firebase.initializeApp(CONFIG.FIREBASE);
 
-  // Ẩn phần đăng nhập, hiện luôn phần upload
-  document.getElementById("auth-section").style.display = "none";
-  document.getElementById("app-section").classList.remove("hidden");
-  document.getElementById("user-info").style.display = "none"; // Ẩn nút logout
+  // Gán sự kiện nút bấm (Chỉ gán, không chạy lệnh ẩn/hiện giao diện nữa)
+  const btnUpload = document.getElementById("upload_btn");
+  const btnRefresh = document.getElementById("refresh_btn");
 
-  // Gán sự kiện
-  document.getElementById("upload_btn").onclick = handleUpload;
-  document.getElementById("refresh_btn").onclick = loadFilesFromFirebase;
+  if (btnUpload) btnUpload.onclick = handleUpload;
+  if (btnRefresh) btnRefresh.onclick = loadFilesFromFirebase;
 
-  // Tải danh sách ngay khi vào trang
+  // Tải danh sách ngay lập tức
   loadFilesFromFirebase();
 });
 
-// --- Upload Logic (Mới: Tự lấy Token) ---
+// ==========================================
+// 3. UPLOAD LOGIC (SERVER-SIDE AUTH)
+// ==========================================
 async function handleUpload() {
   const fileInput = document.getElementById("fileInput");
   const file = fileInput.files[0];
@@ -52,21 +50,28 @@ async function handleUpload() {
 
   if (!file) return alert("Vui lòng chọn file trước!");
 
-  statusDiv.innerText = "⏳ Đang xin quyền truy cập...";
+  statusDiv.innerText = "⏳ Đang kết nối máy chủ...";
   statusDiv.style.color = "#e67e22";
 
   try {
-    // 1. Gọi Backend để xin Token của chủ web
+    // BƯỚC 1: Xin Token từ Netlify
     const tokenRes = await fetch(CONFIG.GET_TOKEN_URL);
-    const tokenData = await tokenRes.json();
+    if (!tokenRes.ok) {
+      const errText = await tokenRes.text();
+      throw new Error("Lỗi Netlify: " + errText);
+    }
 
+    const tokenData = await tokenRes.json();
     if (!tokenData.accessToken)
-      throw new Error("Không lấy được quyền upload từ server");
+      throw new Error(
+        "Server không trả về Token (Kiểm tra lại Env Var trên Netlify)"
+      );
+
     const accessToken = tokenData.accessToken;
 
+    // BƯỚC 2: Upload lên Google Drive
     statusDiv.innerText = "⏳ Đang upload lên Google Drive...";
 
-    // 2. Upload file dùng Token vừa xin được
     const metadata = {
       name: file.name,
       mimeType: file.type,
@@ -92,9 +97,8 @@ async function handleUpload() {
     const driveFile = await response.json();
     if (driveFile.error) throw new Error(driveFile.error.message);
 
-    statusDiv.innerText = "💾 Upload xong. Đang lưu vào Database...";
-
-    // 3. Lưu vào Firebase
+    // BƯỚC 3: Lưu thông tin vào Firebase
+    statusDiv.innerText = "💾 Upload xong. Đang lưu Database...";
     await saveToDatabase(driveFile);
 
     statusDiv.innerText = "✅ Hoàn tất!";
@@ -120,11 +124,13 @@ async function saveToDatabase(fileData) {
     body: JSON.stringify(payload),
   });
 
-  if (!res.ok) throw new Error("Lỗi lưu Database");
+  if (!res.ok) throw new Error("Lỗi khi lưu vào Firebase");
   loadFilesFromFirebase();
 }
 
-// --- UI & Helpers ---
+// ==========================================
+// 4. DANH SÁCH & UI
+// ==========================================
 function loadFilesFromFirebase() {
   const db = firebase.database();
   const list = document.getElementById("file-list");
@@ -140,6 +146,7 @@ function loadFilesFromFirebase() {
           '<li style="text-align:center; padding:10px; color:#999">Chưa có file nào</li>';
         return;
       }
+
       const files = Object.values(data).reverse();
       files.forEach((file) => {
         const li = document.createElement("li");
@@ -154,5 +161,8 @@ function loadFilesFromFirebase() {
         list.appendChild(li);
       });
     })
-    .catch((err) => console.error(err));
+    .catch((err) => {
+      console.error(err);
+      list.innerHTML = '<li style="color:red">Lỗi tải danh sách</li>';
+    });
 }
