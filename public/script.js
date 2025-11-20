@@ -2,15 +2,13 @@
 // 1. CẤU HÌNH
 // ==========================================
 const CONFIG = {
-  // Key của bạn (Lưu ý: Bạn đã lộ key này trên chat, sau này nên đổi lại key mới để bảo mật)
-  CLIENT_ID:
-    "511529666068-k3efqgqos81laubpval0ibgqjihas4nj.apps.googleusercontent.com",
-  API_KEY: "AIzaSyAs51r-N13B7iFeTV1lyR5D_doShhnRf-s",
+  // URL lấy token (Chạy qua Backend Netlify)
+  GET_TOKEN_URL: "https://dnduc-drive.netlify.app/.netlify/functions/getToken",
 
-  // URL function Netlify
-  NETLIFY_URL: "https://dnduc-drive.netlify.app/.netlify/functions/saveFile",
+  // URL lưu DB
+  SAVE_DB_URL: "https://dnduc-drive.netlify.app/.netlify/functions/saveFile",
 
-  // ID thư mục bạn muốn lưu
+  // ID thư mục
   FOLDER_ID: "1i__DIWWEX7HYemtyZ5wqwaYcYfnW50a3",
 
   FIREBASE: {
@@ -32,75 +30,21 @@ const CONFIG = {
 
 document.addEventListener("DOMContentLoaded", () => {
   firebase.initializeApp(CONFIG.FIREBASE);
-  const db = firebase.database();
 
-  document.getElementById("authorize_button").onclick = handleAuthClick;
-  document.getElementById("signout_button").onclick = handleSignoutClick;
+  // Ẩn phần đăng nhập, hiện luôn phần upload
+  document.getElementById("auth-section").style.display = "none";
+  document.getElementById("app-section").classList.remove("hidden");
+  document.getElementById("user-info").style.display = "none"; // Ẩn nút logout
+
+  // Gán sự kiện
   document.getElementById("upload_btn").onclick = handleUpload;
   document.getElementById("refresh_btn").onclick = loadFilesFromFirebase;
+
+  // Tải danh sách ngay khi vào trang
+  loadFilesFromFirebase();
 });
 
-const DISCOVERY_DOC =
-  "https://www.googleapis.com/discovery/v1/apis/drive/v3/rest";
-const SCOPES = "https://www.googleapis.com/auth/drive.file";
-let tokenClient;
-let gapiInited = false;
-let gisInited = false;
-
-function gapiLoaded() {
-  gapi.load("client", async () => {
-    await gapi.client.init({
-      apiKey: CONFIG.API_KEY,
-      discoveryDocs: [DISCOVERY_DOC],
-    });
-    gapiInited = true;
-    maybeEnableButtons();
-  });
-}
-
-function gisLoaded() {
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: CONFIG.CLIENT_ID,
-    scope: SCOPES,
-    callback: "",
-  });
-  gisInited = true;
-  maybeEnableButtons();
-}
-
-function maybeEnableButtons() {
-  if (gapiInited && gisInited) {
-  }
-}
-
-function handleAuthClick() {
-  tokenClient.callback = async (resp) => {
-    if (resp.error) {
-      console.error(resp);
-      alert("Lỗi đăng nhập: " + JSON.stringify(resp));
-      return;
-    }
-    toggleViews(true);
-    loadFilesFromFirebase();
-  };
-
-  if (gapi.client.getToken() === null) {
-    tokenClient.requestAccessToken({ prompt: "consent" });
-  } else {
-    tokenClient.requestAccessToken({ prompt: "" });
-  }
-}
-
-function handleSignoutClick() {
-  const token = gapi.client.getToken();
-  if (token !== null) {
-    google.accounts.oauth2.revoke(token.access_token);
-    gapi.client.setToken("");
-    toggleViews(false);
-  }
-}
-
-// --- Upload Logic (ĐÃ SỬA) ---
+// --- Upload Logic (Mới: Tự lấy Token) ---
 async function handleUpload() {
   const fileInput = document.getElementById("fileInput");
   const file = fileInput.files[0];
@@ -108,13 +52,21 @@ async function handleUpload() {
 
   if (!file) return alert("Vui lòng chọn file trước!");
 
-  statusDiv.innerText = "⏳ Đang upload lên Google Drive...";
+  statusDiv.innerText = "⏳ Đang xin quyền truy cập...";
   statusDiv.style.color = "#e67e22";
 
   try {
-    const accessToken = gapi.client.getToken().access_token;
+    // 1. Gọi Backend để xin Token của chủ web
+    const tokenRes = await fetch(CONFIG.GET_TOKEN_URL);
+    const tokenData = await tokenRes.json();
 
-    // [QUAN TRỌNG] Đã thêm parents để đưa file vào đúng folder
+    if (!tokenData.accessToken)
+      throw new Error("Không lấy được quyền upload từ server");
+    const accessToken = tokenData.accessToken;
+
+    statusDiv.innerText = "⏳ Đang upload lên Google Drive...";
+
+    // 2. Upload file dùng Token vừa xin được
     const metadata = {
       name: file.name,
       mimeType: file.type,
@@ -142,6 +94,7 @@ async function handleUpload() {
 
     statusDiv.innerText = "💾 Upload xong. Đang lưu vào Database...";
 
+    // 3. Lưu vào Firebase
     await saveToDatabase(driveFile);
 
     statusDiv.innerText = "✅ Hoàn tất!";
@@ -162,17 +115,12 @@ async function saveToDatabase(fileData) {
     downloadLink: fileData.webContentLink,
   };
 
-  const res = await fetch(CONFIG.NETLIFY_URL, {
+  const res = await fetch(CONFIG.SAVE_DB_URL, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 
-  if (!res.ok) {
-    throw new Error(
-      "Lỗi khi gọi Netlify Function (Kiểm tra Env Var): " + res.statusText
-    );
-  }
-
+  if (!res.ok) throw new Error("Lỗi lưu Database");
   loadFilesFromFirebase();
 }
 
@@ -181,7 +129,6 @@ function loadFilesFromFirebase() {
   const db = firebase.database();
   const list = document.getElementById("file-list");
 
-  // Thêm xử lý lỗi permission
   db.ref("files")
     .once("value")
     .then((snapshot) => {
@@ -207,19 +154,5 @@ function loadFilesFromFirebase() {
         list.appendChild(li);
       });
     })
-    .catch((error) => {
-      console.error(error);
-      list.innerHTML =
-        '<li style="color:red; text-align:center">Lỗi: Không thể đọc dữ liệu (Kiểm tra Rules Firebase)</li>';
-    });
-}
-
-function toggleViews(isLoggedIn) {
-  if (isLoggedIn) {
-    document.getElementById("auth-section").classList.add("hidden");
-    document.getElementById("app-section").classList.remove("hidden");
-  } else {
-    document.getElementById("auth-section").classList.remove("hidden");
-    document.getElementById("app-section").classList.add("hidden");
-  }
+    .catch((err) => console.error(err));
 }

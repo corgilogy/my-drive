@@ -3,34 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Drive Manager App</title>
+    <title>Drive Manager - No Login</title>
     <link rel="stylesheet" href="style.css" />
 
-    <!-- Firebase -->
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-
-    <!-- QUAN TRỌNG: Đưa script logic lên đầu để tránh lỗi "not defined" -->
-    <script src="script.js"></script>
   </head>
   <body>
     <div class="container">
       <header>
-        <h1>☁️ Quản lý File Drive</h1>
-        <p class="subtitle">
-          Upload lên Google Drive - Lưu dữ liệu tại Firebase
-        </p>
+        <h1>☁️ Upload File Công Khai</h1>
+        <p class="subtitle">Tải file lên Google Drive (Không cần đăng nhập)</p>
       </header>
 
-      <div id="auth-section">
-        <p>Vui lòng đăng nhập để tiếp tục</p>
-        <button id="authorize_button" class="btn-primary">
-          Đăng nhập Google
-        </button>
-      </div>
+      <!-- Phần auth-section cũ đã xóa vì không cần nữa -->
 
-      <div id="app-section" class="hidden">
-        <div class="user-info">
+      <!-- KHU VỰC ỨNG DỤNG -->
+      <div id="app-section">
+        <!-- Nút đăng xuất ẩn đi -->
+        <div id="user-info" class="user-info" style="display: none">
           <button id="signout_button" class="btn-secondary">Đăng xuất</button>
         </div>
 
@@ -55,18 +47,7 @@
       </div>
     </div>
 
-    <!-- Google Scripts -->
-    <script
-      async
-      defer
-      src="https://apis.google.com/js/api.js"
-      onload="gapiLoaded()"
-    ></script>
-    <script
-      async
-      defer
-      src="https://accounts.google.com/gsi/client"
-      onload="gisLoaded()"
-    ></script>
+    <!-- Script Logic -->
+    <script src="script.js"></script>
   </body>
 </html>
