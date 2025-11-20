@@ -4,6 +4,9 @@
 const CONFIG = {
   GET_TOKEN_URL: "https://dnduc-drive.netlify.app/.netlify/functions/getToken",
   SAVE_DB_URL: "https://dnduc-drive.netlify.app/.netlify/functions/saveFile",
+  DELETE_FILE_URL: "//dnduc-drive.netlify.app/.netlify/functions/deleteFile",
+
+  SYNC_URL: "//dnduc-drive.netlify.app/.netlify/functions/syncFiles",
 
   // 👇 MỚI: Thêm đường dẫn function xóa
   DELETE_FILE_URL:
@@ -211,3 +214,57 @@ function loadFilesFromFirebase() {
       list.innerHTML = '<li style="color:red">Lỗi tải danh sách</li>';
     });
 }
+async function handleSync() {
+  const btnSync = document.getElementById("sync_btn");
+  const originalText = btnSync.innerText;
+
+  if (
+    !confirm(
+      "Bạn có muốn đồng bộ lại danh sách từ Google Drive không?\n(Hành động này sẽ cập nhật lại toàn bộ danh sách trên web giống hệt trong Drive)"
+    )
+  ) {
+    return;
+  }
+
+  btnSync.innerText = "⏳ Đang quét...";
+  btnSync.disabled = true;
+
+  try {
+    const res = await fetch(CONFIG.SYNC_URL, {
+      method: "POST",
+      body: JSON.stringify({ folderId: CONFIG.FOLDER_ID }),
+    });
+
+    if (!res.ok) throw new Error("Lỗi kết nối Server");
+
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    alert(`✅ Đã đồng bộ xong! Tìm thấy ${data.count} file.`);
+    loadFilesFromFirebase(); // Tải lại danh sách mới
+  } catch (error) {
+    console.error(error);
+    alert("❌ Lỗi đồng bộ: " + error.message);
+  } finally {
+    btnSync.innerText = originalText;
+    btnSync.disabled = false;
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  firebase.initializeApp(CONFIG.FIREBASE);
+
+  const btnUpload = document.getElementById("upload_btn");
+  const btnRefresh = document.getElementById("refresh_btn");
+
+  // 👇 THÊM NÚT SYNC (Lát nữa sẽ thêm vào HTML)
+  const btnSync = document.getElementById("sync_btn");
+
+  if (btnUpload) btnUpload.onclick = handleUpload;
+  if (btnRefresh) btnRefresh.onclick = loadFilesFromFirebase;
+
+  // 👇 GÁN SỰ KIỆN
+  if (btnSync) btnSync.onclick = handleSync;
+
+  loadFilesFromFirebase();
+});

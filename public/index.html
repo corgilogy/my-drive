@@ -38,7 +38,19 @@
         <div class="card">
           <div class="card-header">
             <h3>📂 Danh sách File đã lưu</h3>
-            <button id="refresh_btn" class="btn-small">🔄 Làm mới</button>
+            <div style="display: flex; gap: 5px">
+              <!-- Nút Sync mới -->
+              <button
+                id="sync_btn"
+                class="btn-small"
+                style="border-color: #e67e22; color: #e67e22"
+              >
+                🔄 Đồng bộ Drive
+              </button>
+
+              <!-- Nút Refresh cũ (chỉ load từ Firebase) -->
+              <button id="refresh_btn" class="btn-small">Tải lại</button>
+            </div>
           </div>
           <ul id="file-list" class="file-list">
             <li>Đang tải dữ liệu...</li>
