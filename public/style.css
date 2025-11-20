@@ -162,3 +162,24 @@ input[type="file"] {
   background-color: #e6f4ea;
   color: #0f9d58;
 }
+/* ... (giữ nguyên các cái cũ) ... */
+
+/* Thêm cái này vào cuối file style.css */
+.del-link {
+  background-color: #ffebee;
+  color: #c62828;
+  border: 1px solid #ffcdd2;
+}
+.del-link:hover {
+  background-color: #ef9a9a;
+  color: white;
+}
+.view-link,
+.down-link,
+.del-link {
+  display: inline-flex; /* Để canh giữa icon */
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  min-width: 30px; /* Nút vuông vức chút */
+}

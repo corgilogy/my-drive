@@ -2,11 +2,13 @@
 // 1. CẤU HÌNH
 // ==========================================
 const CONFIG = {
-  // Link gọi Backend
   GET_TOKEN_URL: "https://dnduc-drive.netlify.app/.netlify/functions/getToken",
   SAVE_DB_URL: "https://dnduc-drive.netlify.app/.netlify/functions/saveFile",
 
-  // ID thư mục bạn muốn lưu
+  // 👇 MỚI: Thêm đường dẫn function xóa
+  DELETE_FILE_URL:
+    "https://dnduc-drive.netlify.app/.netlify/functions/deleteFile",
+
   FOLDER_ID: "1i__DIWWEX7HYemtyZ5wqwaYcYfnW50a3",
 
   FIREBASE: {
@@ -23,25 +25,22 @@ const CONFIG = {
 };
 
 // ==========================================
-// 2. KHỞI TẠO (Đã sửa lỗi null)
+// 2. KHỞI TẠO
 // ==========================================
 document.addEventListener("DOMContentLoaded", () => {
-  // Khởi tạo Firebase
   firebase.initializeApp(CONFIG.FIREBASE);
 
-  // Gán sự kiện nút bấm (Chỉ gán, không chạy lệnh ẩn/hiện giao diện nữa)
   const btnUpload = document.getElementById("upload_btn");
   const btnRefresh = document.getElementById("refresh_btn");
 
   if (btnUpload) btnUpload.onclick = handleUpload;
   if (btnRefresh) btnRefresh.onclick = loadFilesFromFirebase;
 
-  // Tải danh sách ngay lập tức
   loadFilesFromFirebase();
 });
 
 // ==========================================
-// 3. UPLOAD LOGIC (SERVER-SIDE AUTH)
+// 3. UPLOAD LOGIC
 // ==========================================
 async function handleUpload() {
   const fileInput = document.getElementById("fileInput");
@@ -54,22 +53,11 @@ async function handleUpload() {
   statusDiv.style.color = "#e67e22";
 
   try {
-    // BƯỚC 1: Xin Token từ Netlify
     const tokenRes = await fetch(CONFIG.GET_TOKEN_URL);
-    if (!tokenRes.ok) {
-      const errText = await tokenRes.text();
-      throw new Error("Lỗi Netlify: " + errText);
-    }
-
+    if (!tokenRes.ok) throw new Error("Lỗi Netlify lấy token");
     const tokenData = await tokenRes.json();
-    if (!tokenData.accessToken)
-      throw new Error(
-        "Server không trả về Token (Kiểm tra lại Env Var trên Netlify)"
-      );
-
     const accessToken = tokenData.accessToken;
 
-    // BƯỚC 2: Upload lên Google Drive
     statusDiv.innerText = "⏳ Đang upload lên Google Drive...";
 
     const metadata = {
@@ -97,8 +85,7 @@ async function handleUpload() {
     const driveFile = await response.json();
     if (driveFile.error) throw new Error(driveFile.error.message);
 
-    // BƯỚC 3: Lưu thông tin vào Firebase
-    statusDiv.innerText = "💾 Upload xong. Đang lưu Database...";
+    statusDiv.innerText = "💾 Đang lưu Database...";
     await saveToDatabase(driveFile);
 
     statusDiv.innerText = "✅ Hoàn tất!";
@@ -124,12 +111,58 @@ async function saveToDatabase(fileData) {
     body: JSON.stringify(payload),
   });
 
-  if (!res.ok) throw new Error("Lỗi khi lưu vào Firebase");
+  if (!res.ok) throw new Error("Lỗi lưu Firebase");
   loadFilesFromFirebase();
 }
 
 // ==========================================
-// 4. DANH SÁCH & UI
+// 4. XỬ LÝ XÓA FILE (MỚI)
+// ==========================================
+async function handleDelete(firebaseKey, googleFileId, fileName) {
+  if (
+    !confirm(
+      `Bạn có chắc muốn xóa file "${fileName}" không?\n(Hành động này sẽ xóa vĩnh viễn trên Google Drive)`
+    )
+  ) {
+    return;
+  }
+
+  const btnDelete = document.getElementById(`btn-del-${firebaseKey}`);
+  const originalText = btnDelete.innerText;
+  btnDelete.innerText = "⏳...";
+  btnDelete.disabled = true;
+
+  try {
+    // Bước 1: Gọi Netlify để xóa trên Google Drive trước
+    const res = await fetch(CONFIG.DELETE_FILE_URL, {
+      method: "POST",
+      body: JSON.stringify({ fileId: googleFileId }),
+    });
+
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.error || "Lỗi xóa Drive");
+    }
+
+    // Bước 2: Nếu Drive xóa OK -> Xóa trên Firebase Database
+    await firebase
+      .database()
+      .ref("files/" + firebaseKey)
+      .remove();
+
+    // Bước 3: Làm mới danh sách
+    loadFilesFromFirebase();
+    alert("✅ Đã xóa thành công!");
+  } catch (error) {
+    console.error(error);
+    alert("❌ Lỗi: " + error.message);
+    btnDelete.innerText = originalText;
+    btnDelete.disabled = false;
+  }
+}
+
+// ==========================================
+// 5. DANH SÁCH & UI (CẬP NHẬT)
 // ==========================================
 function loadFilesFromFirebase() {
   const db = firebase.database();
@@ -147,15 +180,27 @@ function loadFilesFromFirebase() {
         return;
       }
 
-      const files = Object.values(data).reverse();
-      files.forEach((file) => {
+      // 👇 CẬP NHẬT: Dùng Object.entries để lấy cả KEY và VALUE
+      // Object.entries trả về mảng: [ ['key1', {data}], ['key2', {data}] ]
+      const entries = Object.entries(data).reverse();
+
+      entries.forEach(([key, file]) => {
         const li = document.createElement("li");
         li.className = "file-item";
+
+        // Tạo HTML có thêm nút Xóa
         li.innerHTML = `
             <span class="file-name" title="${file.fileName}">${file.fileName}</span>
             <div class="file-actions">
-                <a href="${file.viewLink}" target="_blank" class="link-btn view-link">👁️ Mở</a>
-                <a href="${file.downloadLink}" class="link-btn down-link">⬇️ Tải</a>
+                <a href="${file.viewLink}" target="_blank" class="link-btn view-link">👁️</a>
+                <a href="${file.downloadLink}" class="link-btn down-link">⬇️</a>
+                
+                <!-- Nút Xóa mới -->
+                <button 
+                    id="btn-del-${key}"
+                    class="link-btn del-link" 
+                    onclick="handleDelete('${key}', '${file.fileId}', '${file.fileName}')"
+                >🗑️</button>
             </div>
         `;
         list.appendChild(li);
