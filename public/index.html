@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Drive Manager App</title>
+    <!-- Liên kết file CSS -->
+    <link rel="stylesheet" href="style.css" />
+    <!-- Thư viện Firebase (Phiên bản tương thích cũ để dễ dùng) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>☁️ Quản lý File Drive</h1>
+        <p class="subtitle">
+          Upload lên Google Drive - Lưu dữ liệu tại Firebase
+        </p>
+      </header>
+
+      <!-- KHU VỰC ĐĂNG NHẬP -->
+      <div id="auth-section">
+        <p>Vui lòng đăng nhập để tiếp tục</p>
+        <button id="authorize_button" class="btn-primary">
+          Đăng nhập Google
+        </button>
+      </div>
+
+      <!-- KHU VỰC ỨNG DỤNG (Hiện ra sau khi login) -->
+      <div id="app-section" class="hidden">
+        <div class="user-info">
+          <button id="signout_button" class="btn-secondary">Đăng xuất</button>
+        </div>
+
+        <!-- Form Upload -->
+        <div class="card">
+          <h3>📤 Tải file lên</h3>
+          <div class="upload-box">
+            <input type="file" id="fileInput" />
+            <button id="upload_btn" class="btn-success">Upload ngay</button>
+          </div>
+          <div id="progress-status" class="status-text"></div>
+        </div>
+
+        <!-- Danh sách file -->
+        <div class="card">
+          <div class="card-header">
+            <h3>📂 Danh sách File đã lưu</h3>
+            <button id="refresh_btn" class="btn-small">🔄 Làm mới</button>
+          </div>
+          <ul id="file-list" class="file-list">
+            <!-- File sẽ được Javascript thêm vào đây -->
+            <li>Đang tải dữ liệu...</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Thư viện Google API -->
+    <script
+      async
+      defer
+      src="https://apis.google.com/js/api.js"
+      onload="gapiLoaded()"
+    ></script>
+    <script
+      async
+      defer
+      src="https://accounts.google.com/gsi/client"
+      onload="gisLoaded()"
+    ></script>
+
+    <!-- Liên kết file JS logic -->
+    <script src="script.js"></script>
+  </body>
+</html>
