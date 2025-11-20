@@ -3,8 +3,8 @@
 // ==========================================
 const CONFIG = {
   // Link gọi Backend
-  GET_TOKEN_URL: "/.netlify/functions/getToken",
-  SAVE_DB_URL: "/.netlify/functions/saveFile",
+  GET_TOKEN_URL: "https://dnduc-drive.netlify.app/.netlify/functions/getToken",
+  SAVE_DB_URL: "https://dnduc-drive.netlify.app/.netlify/functions/saveFile",
 
   // ID thư mục bạn muốn lưu
   FOLDER_ID: "1i__DIWWEX7HYemtyZ5wqwaYcYfnW50a3",
