@@ -11,6 +11,8 @@ const CONFIG = {
   // Nếu chạy localhost thì để trống hoặc localhost, nhưng quan trọng nhất là lúc Deploy
   NETLIFY_URL: "https://dnduc-drive.netlify.app/.netlify/functions/saveFile",
 
+  FOLDER_ID: "1i__DIWWEX7HYemtyZ5wqwaYcYfnW50a3",
+
   FIREBASE: {
     apiKey: "AIzaSyDOUCC56svyZ5pGZV7z160PW4Z8rJ01jdw",
     authDomain: "dnduc-drive.firebaseapp.com",
