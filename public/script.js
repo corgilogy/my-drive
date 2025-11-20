@@ -1,16 +1,16 @@
 // ==========================================
-// 1. CẤU HÌNH (HÃY ĐIỀN 3 DÒNG ĐẦU TIÊN)
+// 1. CẤU HÌNH
 // ==========================================
 const CONFIG = {
-  // ⚠️ BẮT BUỘC THAY BẰNG MÃ CỦA BẠN
+  // Key của bạn (Lưu ý: Bạn đã lộ key này trên chat, sau này nên đổi lại key mới để bảo mật)
   CLIENT_ID:
     "511529666068-k3efqgqos81laubpval0ibgqjihas4nj.apps.googleusercontent.com",
   API_KEY: "AIzaSyAs51r-N13B7iFeTV1lyR5D_doShhnRf-s",
 
-  // URL function sau khi deploy (Ví dụ: https://my-app.netlify.app/.netlify/functions/saveFile)
-  // Nếu chạy localhost thì để trống hoặc localhost, nhưng quan trọng nhất là lúc Deploy
+  // URL function Netlify
   NETLIFY_URL: "https://dnduc-drive.netlify.app/.netlify/functions/saveFile",
 
+  // ID thư mục bạn muốn lưu
   FOLDER_ID: "1i__DIWWEX7HYemtyZ5wqwaYcYfnW50a3",
 
   FIREBASE: {
@@ -30,19 +30,16 @@ const CONFIG = {
 // 2. LOGIC CHƯƠNG TRÌNH
 // ==========================================
 
-// Đợi trang load xong mới chạy logic DOM
 document.addEventListener("DOMContentLoaded", () => {
   firebase.initializeApp(CONFIG.FIREBASE);
   const db = firebase.database();
 
-  // Gán sự kiện cho các nút bấm
   document.getElementById("authorize_button").onclick = handleAuthClick;
   document.getElementById("signout_button").onclick = handleSignoutClick;
   document.getElementById("upload_btn").onclick = handleUpload;
   document.getElementById("refresh_btn").onclick = loadFilesFromFirebase;
 });
 
-// Biến Global cần thiết cho Google Script gọi lại
 const DISCOVERY_DOC =
   "https://www.googleapis.com/discovery/v1/apis/drive/v3/rest";
 const SCOPES = "https://www.googleapis.com/auth/drive.file";
@@ -50,7 +47,6 @@ let tokenClient;
 let gapiInited = false;
 let gisInited = false;
 
-// --- Google Auth Functions ---
 function gapiLoaded() {
   gapi.load("client", async () => {
     await gapi.client.init({
@@ -66,7 +62,7 @@ function gisLoaded() {
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CONFIG.CLIENT_ID,
     scope: SCOPES,
-    callback: "", // Sẽ được gán khi click nút
+    callback: "",
   });
   gisInited = true;
   maybeEnableButtons();
@@ -74,8 +70,6 @@ function gisLoaded() {
 
 function maybeEnableButtons() {
   if (gapiInited && gisInited) {
-    // Kiểm tra nếu đã có session từ trước (Tùy chọn)
-    // Hiển thị nút đăng nhập
   }
 }
 
@@ -106,7 +100,7 @@ function handleSignoutClick() {
   }
 }
 
-// --- Upload Logic ---
+// --- Upload Logic (ĐÃ SỬA) ---
 async function handleUpload() {
   const fileInput = document.getElementById("fileInput");
   const file = fileInput.files[0];
@@ -119,7 +113,14 @@ async function handleUpload() {
 
   try {
     const accessToken = gapi.client.getToken().access_token;
-    const metadata = { name: file.name, mimeType: file.type };
+
+    // [QUAN TRỌNG] Đã thêm parents để đưa file vào đúng folder
+    const metadata = {
+      name: file.name,
+      mimeType: file.type,
+      parents: [CONFIG.FOLDER_ID],
+    };
+
     const form = new FormData();
     form.append(
       "metadata",
@@ -141,7 +142,6 @@ async function handleUpload() {
 
     statusDiv.innerText = "💾 Upload xong. Đang lưu vào Database...";
 
-    // Gửi sang Netlify Function
     await saveToDatabase(driveFile);
 
     statusDiv.innerText = "✅ Hoàn tất!";
@@ -162,14 +162,15 @@ async function saveToDatabase(fileData) {
     downloadLink: fileData.webContentLink,
   };
 
-  // Gọi Backend
   const res = await fetch(CONFIG.NETLIFY_URL, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 
   if (!res.ok) {
-    throw new Error("Lỗi khi gọi Netlify Function: " + res.statusText);
+    throw new Error(
+      "Lỗi khi gọi Netlify Function (Kiểm tra Env Var): " + res.statusText
+    );
   }
 
   loadFilesFromFirebase();
@@ -177,9 +178,10 @@ async function saveToDatabase(fileData) {
 
 // --- UI & Helpers ---
 function loadFilesFromFirebase() {
-  const db = firebase.database(); // Lấy lại instance
+  const db = firebase.database();
   const list = document.getElementById("file-list");
 
+  // Thêm xử lý lỗi permission
   db.ref("files")
     .once("value")
     .then((snapshot) => {
@@ -204,6 +206,11 @@ function loadFilesFromFirebase() {
         `;
         list.appendChild(li);
       });
+    })
+    .catch((error) => {
+      console.error(error);
+      list.innerHTML =
+        '<li style="color:red; text-align:center">Lỗi: Không thể đọc dữ liệu (Kiểm tra Rules Firebase)</li>';
     });
 }
 
