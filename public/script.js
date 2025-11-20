@@ -5,11 +5,10 @@ const MY_PASSWORD = "321321"; // Mật khẩu của bạn
 
 const CONFIG = {
   // 👇 QUAN TRỌNG: Phải dùng đường dẫn đầy đủ tới Netlify
-  GET_TOKEN_URL: "https://dnduc-drive.netlify.app/.netlify/functions/getToken",
-  SAVE_DB_URL: "https://dnduc-drive.netlify.app/.netlify/functions/saveFile",
-  DELETE_FILE_URL:
-    "https://dnduc-drive.netlify.app/.netlify/functions/deleteFile",
-  SYNC_URL: "https://dnduc-drive.netlify.app/.netlify/functions/syncFiles",
+  GET_TOKEN_URL: "https://bsduc.netlify.app/.netlify/functions/getToken",
+  SAVE_DB_URL: "https://bsduc.netlify.app/.netlify/functions/saveFile",
+  DELETE_FILE_URL: "https://bsduc.netlify.app/.netlify/functions/deleteFile",
+  SYNC_URL: "https://bsduc.netlify.app/.netlify/functions/syncFiles",
 
   FOLDER_ID: "1i__DIWWEX7HYemtyZ5wqwaYcYfnW50a3",
 
