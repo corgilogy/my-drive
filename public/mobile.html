@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Corgi Drive Mobile</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link rel="stylesheet" href="mobile.css" />
+  </head>
+  <body>
+    <!-- LOGIN SCREEN -->
+    <div id="login-screen">
+      <div class="login-content">
+        <img src="log.png" class="login-logo" alt="Logo" />
+        <h1>Corgi Drive</h1>
+        <div class="login-input-group">
+          <input
+            type="password"
+            id="pass-input"
+            placeholder="Nhập mật khẩu..."
+          />
+          <button id="btn-login">
+            <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </div>
+        <p id="login-error" class="hidden">Sai mật khẩu!</p>
+      </div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="app-screen" class="hidden">
+      <!-- Header -->
+      <header class="app-header">
+        <button id="menu-btn"><i class="fa-solid fa-bars"></i></button>
+        <div class="search-bar">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="search-input" placeholder="Tìm kiếm..." />
+        </div>
+        <button id="sync-btn"><i class="fa-solid fa-rotate"></i></button>
+      </header>
+
+      <!-- Filter Drawer (Sidebar ẩn) -->
+      <div id="drawer-overlay" class="hidden"></div>
+      <aside id="app-drawer">
+        <div class="drawer-header">
+          <img src="log.png" alt="Logo" />
+          <span>Bộ lọc</span>
+        </div>
+        <div class="drawer-content">
+          <div class="filter-section">
+            <h3>Tags</h3>
+            <div id="tag-filters" class="chip-container">
+              <!-- JS render tags -->
+            </div>
+          </div>
+          <div class="filter-section">
+            <h3>Loại file</h3>
+            <div id="type-filters" class="chip-container">
+              <!-- JS render types -->
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- File List -->
+      <div class="file-list-container">
+        <div class="list-header">
+          <span>Tổng: <b id="file-count">0</b> file</span>
+        </div>
+        <ul id="file-list">
+          <!-- JS render files -->
+          <li class="loading-msg">Đang tải dữ liệu...</li>
+        </ul>
+      </div>
+
+      <!-- Floating Upload Button -->
+      <button id="fab-upload"><i class="fa-solid fa-plus"></i></button>
+
+      <!-- Upload Modal -->
+      <div id="upload-modal" class="modal hidden">
+        <div class="modal-content">
+          <h3>Tải lên file mới</h3>
+          <div class="file-select-area">
+            <input type="file" id="file-input" hidden />
+            <label for="file-input" class="file-label">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+              <span id="file-name-display">Chọn file...</span>
+            </label>
+          </div>
+
+          <div class="tag-input-area">
+            <div class="input-row">
+              <input type="text" id="new-tag-input" placeholder="Nhập tag..." />
+              <button id="add-tag-btn"><i class="fa-solid fa-plus"></i></button>
+            </div>
+            <div id="upload-tags-list" class="tags-list"></div>
+          </div>
+
+          <div class="modal-actions">
+            <button id="cancel-upload" class="btn-cancel">Hủy</button>
+            <button id="confirm-upload" class="btn-confirm">Upload</button>
+          </div>
+          <div id="upload-status"></div>
+        </div>
+      </div>
+
+      <!-- Action Sheet (Menu 3 chấm) -->
+      <div id="action-sheet" class="modal hidden">
+        <div class="sheet-content">
+          <h3 id="sheet-filename">Tên file</h3>
+          <div class="sheet-options">
+            <button class="sheet-btn rename" id="sheet-rename">
+              <i class="fa-solid fa-pen"></i> Đổi tên
+            </button>
+            <a
+              href="#"
+              target="_blank"
+              class="sheet-btn download"
+              id="sheet-download"
+              ><i class="fa-solid fa-download"></i> Tải xuống</a
+            >
+            <button class="sheet-btn delete" id="sheet-delete">
+              <i class="fa-solid fa-trash"></i> Xóa file
+            </button>
+            <button class="sheet-btn cancel" id="sheet-close">Đóng</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rename Modal -->
+      <div id="rename-modal" class="modal hidden">
+        <div class="modal-content small">
+          <h3>Đổi tên</h3>
+          <input type="text" id="rename-input" class="full-input" />
+          <div class="modal-actions">
+            <button id="cancel-rename" class="btn-cancel">Hủy</button>
+            <button id="confirm-rename" class="btn-confirm">Lưu</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="mobile.js"></script>
+  </body>
+</html>

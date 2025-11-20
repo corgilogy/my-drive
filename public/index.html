@@ -3,69 +3,189 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Drive - Secured</title>
+    <title>Corgi Drive</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
     <link rel="stylesheet" href="style.css" />
+    <script type="text/javascript">
+      if (
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+          navigator.userAgent
+        )
+      ) {
+        window.location.href = "mobile.html";
+      }
+    </script>
   </head>
   <body>
-    <!-- PHẦN 1: MÀN HÌNH ĐĂNG NHẬP -->
+    <!-- LOGIN SCREEN -->
     <div id="login-overlay">
       <div class="login-box">
-        <h2>Bảo mật</h2>
-        <p>Nhập mật khẩu để truy cập</p>
-        <input
-          type="password"
-          id="password-input"
-          placeholder="Nhập mật khẩu..."
-        />
-        <button id="login-btn">Đăng nhập</button>
-        <p id="error-message" class="error-msg">Mật khẩu sai!</p>
+        <div class="login-header">
+          <img src="log.png" alt="Logo" class="login-logo-img" />
+          <h1 class="login-title">Corgi Drive</h1>
+        </div>
+        <div class="input-group">
+          <input
+            type="password"
+            id="password-input"
+            placeholder="Nhập mật khẩu truy cập..."
+          />
+          <button id="login-btn">
+            <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </div>
+        <p id="error-message" class="error-msg">
+          <i class="fa-solid fa-circle-exclamation"></i> Sai mật khẩu
+        </p>
       </div>
     </div>
 
-    <!-- PHẦN 2: GIAO DIỆN CHÍNH (Ẩn mặc định) -->
+    <!-- DASHBOARD -->
     <div id="main-app">
-      <div class="container">
-        <header>
-          <h1>My Drive</h1>
-          <p class="subtitle">Lưu trữ cá nhân & Riêng tư</p>
-        </header>
+      <!-- SIDEBAR -->
+      <aside class="sidebar">
+        <div class="brand">
+          <i class="fa-brands fa-google-drive"></i> <span>Corgi Drive</span>
+        </div>
 
-        <!-- KHUNG UPLOAD -->
-        <div class="card">
-          <h3>📤 Tải lên file mới</h3>
-          <div class="upload-box">
-            <input type="file" id="fileInput" />
-            <button id="upload_btn" class="btn-primary">
-              Upload lên Drive
-            </button>
+        <button id="btn-open-modal" class="btn-new-file">
+          <i class="fa-solid fa-cloud-arrow-up"></i> Thêm file
+        </button>
+
+        <div class="sidebar-menu">
+          <div class="sidebar-section">
+            <h3><i class="fa-solid fa-tags"></i> Lọc theo Tags</h3>
+            <div class="filter-options" id="tag-filter-list"></div>
           </div>
+          <div class="sidebar-section">
+            <h3><i class="fa-solid fa-filter"></i> Loại File</h3>
+            <div class="filter-options" id="type-filter-list"></div>
+          </div>
+        </div>
+
+        <div class="sidebar-footer">
+          <div class="datetime-display">
+            <div id="current-date">--/--/----</div>
+            <div id="current-time">--:--:--</div>
+          </div>
+          <button id="sync_btn" class="btn-sidebar">
+            <i class="fa-solid fa-rotate"></i> Đồng bộ & Làm mới
+          </button>
+        </div>
+      </aside>
+
+      <!-- CONTENT -->
+      <main class="content-area">
+        <div class="files-wrapper">
+          <!-- PHẦN 1: HEADER CỐ ĐỊNH (TÌM KIẾM + SORT) -->
+          <div class="files-top-bar">
+            <div class="header-tools">
+              <div class="search-box">
+                <i class="fa-solid fa-search"></i>
+                <input
+                  type="text"
+                  id="search-input"
+                  placeholder="Tìm kiếm file..."
+                />
+              </div>
+              <div class="sort-box">
+                <i class="fa-solid fa-arrow-down-short-wide"></i>
+                <select id="sort-select">
+                  <option value="newest">Mới nhất</option>
+                  <option value="name-asc">Tên (A-Z)</option>
+                  <option value="name-desc">Tên (Z-A)</option>
+                  <option value="type">Loại file</option>
+                  <option value="tag">Theo Tags</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- PHẦN 2: KHUNG CHỨA BẢNG (CUỘN ĐƯỢC) -->
+          <div class="table-scroll-container">
+            <table class="file-table">
+              <thead>
+                <tr>
+                  <!-- Tiêu đề bảng được cố định bằng CSS sticky -->
+                  <th style="width: 70%">Tên File</th>
+                  <th style="width: 5%; text-align: center">
+                    <i class="fa-solid fa-star"></i>
+                  </th>
+                  <th style="width: 25%">Tags</th>
+                </tr>
+              </thead>
+              <tbody id="file-list">
+                <tr>
+                  <td colspan="3" class="loading-text">Đang tải dữ liệu...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- POPUP UPLOAD MODAL -->
+    <div id="upload-modal-overlay" class="modal-overlay hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Tải lên file mới</h3>
+          <button id="btn-close-modal" class="close-icon">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <div class="file-drop-area">
+            <input type="file" id="fileInput" hidden />
+            <label for="fileInput" class="file-drop-label">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+              <span id="fileNameDisplay">Nhấn để chọn file</span>
+            </label>
+          </div>
+
+          <div id="rename-upload-container" class="input-wrapper hidden">
+            <label class="input-label">Tên hiển thị:</label>
+            <input
+              type="text"
+              id="uploadFileNameInput"
+              class="modal-input"
+              placeholder="Tên file..."
+            />
+          </div>
+
+          <div class="multi-tag-wrapper">
+            <label class="input-label">Gán thẻ (Tags):</label>
+            <div class="tag-input-group">
+              <input
+                type="text"
+                id="tagInput"
+                list="existing-tags"
+                placeholder="Nhập tag rồi nhấn Enter..."
+              />
+              <button id="add-tag-btn" type="button" title="Thêm tag">
+                <i class="fa-solid fa-plus"></i>
+              </button>
+            </div>
+            <div id="selected-tags-container" class="selected-tags-area"></div>
+            <datalist id="existing-tags"></datalist>
+          </div>
+
           <div id="progress-status" class="status-text"></div>
         </div>
 
-        <!-- KHUNG DANH SÁCH FILE -->
-        <div class="card">
-          <div class="card-header">
-            <h3>📂 Danh sách file</h3>
-            <div class="btn-group">
-              <button id="sync_btn" class="btn-small">
-                🔄 Đồng bộ từ Drive
-              </button>
-              <button id="refresh_btn" class="btn-secondary">Làm mới</button>
-            </div>
-          </div>
-          <ul id="file-list" class="file-list">
-            <!-- Danh sách file sẽ hiện ở đây -->
-            <li style="text-align: center; color: #999">Đang tải dữ liệu...</li>
-          </ul>
+        <div class="modal-footer">
+          <button id="btn-cancel-upload" class="btn-secondary">Hủy bỏ</button>
+          <button id="upload_btn" class="btn-primary">Tải lên ngay</button>
         </div>
       </div>
     </div>
 
-    <!-- THƯ VIỆN FIREBASE (Bắt buộc phải có để chạy script.js) -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
-    <!-- LOGIC CHÍNH -->
     <script src="script.js"></script>
   </body>
 </html>

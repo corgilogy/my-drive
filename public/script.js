@@ -1,17 +1,11 @@
-// ==========================================
-// 1. CẤU HÌNH & BẢO MẬT
-// ==========================================
-const MY_PASSWORD = "321321"; // Mật khẩu của bạn
+const MY_PASSWORD = "321321";
 
 const CONFIG = {
-  // 👇 QUAN TRỌNG: Phải dùng đường dẫn đầy đủ tới Netlify
   GET_TOKEN_URL: "https://bsduc.netlify.app/.netlify/functions/getToken",
   SAVE_DB_URL: "https://bsduc.netlify.app/.netlify/functions/saveFile",
   DELETE_FILE_URL: "https://bsduc.netlify.app/.netlify/functions/deleteFile",
   SYNC_URL: "https://bsduc.netlify.app/.netlify/functions/syncFiles",
-
   FOLDER_ID: "1i__DIWWEX7HYemtyZ5wqwaYcYfnW50a3",
-
   FIREBASE: {
     apiKey: "AIzaSyDOUCC56svyZ5pGZV7z160PW4Z8rJ01jdw",
     authDomain: "dnduc-drive.firebaseapp.com",
@@ -25,9 +19,12 @@ const CONFIG = {
   },
 };
 
-// ==========================================
-// 2. LOGIC ĐĂNG NHẬP & KHỞI TẠO
-// ==========================================
+let ALL_FILES_DATA = [];
+let ACTIVE_TAGS = new Set(["ALL"]);
+let ACTIVE_TYPES = new Set(["ALL"]);
+let currentUploadTags = [];
+let currentSortMode = "newest";
+
 document.addEventListener("DOMContentLoaded", () => {
   const loginOverlay = document.getElementById("login-overlay");
   const mainApp = document.getElementById("main-app");
@@ -35,23 +32,78 @@ document.addEventListener("DOMContentLoaded", () => {
   const loginBtn = document.getElementById("login-btn");
   const errorMsg = document.getElementById("error-message");
 
-  // Kiểm tra session
-  if (sessionStorage.getItem("myDrive_isLoggedIn") === "true") {
-    unlockApp();
-  } else {
-    if (passwordInput) passwordInput.focus();
+  const modal = document.getElementById("upload-modal-overlay");
+  const btnOpenModal = document.getElementById("btn-open-modal");
+  const btnCloseModal = document.getElementById("btn-close-modal");
+  const btnCancelUpload = document.getElementById("btn-cancel-upload");
+
+  const fileInput = document.getElementById("fileInput");
+  const fileNameDisplay = document.getElementById("fileNameDisplay");
+  const uploadFileNameInput = document.getElementById("uploadFileNameInput");
+  const renameContainer = document.getElementById("rename-upload-container");
+
+  const tagInput = document.getElementById("tagInput");
+  const addTagBtn = document.getElementById("add-tag-btn");
+  const sortSelect = document.getElementById("sort-select");
+
+  startClock();
+
+  if (btnOpenModal) {
+    btnOpenModal.onclick = () => {
+      modal.classList.remove("hidden");
+      resetUploadForm();
+    };
+  }
+  const closeModalFunc = () => modal.classList.add("hidden");
+  if (btnCloseModal) btnCloseModal.onclick = closeModalFunc;
+  if (btnCancelUpload) btnCancelUpload.onclick = closeModalFunc;
+
+  if (addTagBtn && tagInput) {
+    addTagBtn.addEventListener("click", () => addTagToList(tagInput));
+    tagInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        addTagToList(tagInput);
+      }
+    });
   }
 
-  // Sự kiện click nút Đăng nhập
-  if (loginBtn) {
-    loginBtn.addEventListener("click", checkLogin);
+  document
+    .getElementById("search-input")
+    .addEventListener("input", (e) => renderFilesTable(e.target.value));
+  if (sortSelect) {
+    sortSelect.addEventListener("change", (e) => {
+      currentSortMode = e.target.value;
+      renderFilesTable(document.getElementById("search-input").value);
+    });
   }
-  // Sự kiện nhấn Enter
-  if (passwordInput) {
+
+  if (fileInput) {
+    fileInput.addEventListener("change", (e) => {
+      if (e.target.files.length > 0) {
+        const file = e.target.files[0];
+        fileNameDisplay.innerText = file.name;
+        fileNameDisplay.style.color = "#4f46e5";
+        fileNameDisplay.style.fontWeight = "bold";
+        renameContainer.classList.remove("hidden");
+        uploadFileNameInput.value = file.name;
+      } else {
+        fileNameDisplay.innerText = "Nhấn để chọn file";
+        fileNameDisplay.style.color = "#4f46e5";
+        fileNameDisplay.style.fontWeight = "600";
+        renameContainer.classList.add("hidden");
+      }
+    });
+  }
+
+  if (sessionStorage.getItem("myDrive_isLoggedIn") === "true") unlockApp();
+  else if (passwordInput) passwordInput.focus();
+
+  if (loginBtn) loginBtn.addEventListener("click", checkLogin);
+  if (passwordInput)
     passwordInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") checkLogin();
     });
-  }
 
   function checkLogin() {
     if (passwordInput.value === MY_PASSWORD) {
@@ -67,60 +119,104 @@ document.addEventListener("DOMContentLoaded", () => {
   function unlockApp() {
     if (loginOverlay) loginOverlay.style.display = "none";
     if (mainApp) mainApp.style.display = "flex";
-
-    // Chạy logic chính sau khi mở khóa
     initializeAppLogic();
   }
 });
 
-// ==========================================
-// 3. LOGIC CHÍNH CỦA APP
-// ==========================================
-function initializeAppLogic() {
-  console.log("App connecting to Netlify Functions...");
-
-  if (typeof firebase !== "undefined" && !firebase.apps.length) {
-    firebase.initializeApp(CONFIG.FIREBASE);
+function startClock() {
+  const dateEl = document.getElementById("current-date");
+  const timeEl = document.getElementById("current-time");
+  function update() {
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, "0");
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const year = now.getFullYear();
+    dateEl.innerText = `${day}/${month}/${year}`;
+    const hrs = String(now.getHours()).padStart(2, "0");
+    const min = String(now.getMinutes()).padStart(2, "0");
+    const sec = String(now.getSeconds()).padStart(2, "0");
+    timeEl.innerText = `${hrs}:${min}:${sec}`;
   }
+  update();
+  setInterval(update, 1000);
+}
 
-  const btnUpload = document.getElementById("upload_btn");
-  const btnRefresh = document.getElementById("refresh_btn");
-  const btnSync = document.getElementById("sync_btn");
+function resetUploadForm() {
+  document.getElementById("fileInput").value = "";
+  document.getElementById("fileNameDisplay").innerText = "Nhấn để chọn file";
+  document.getElementById("fileNameDisplay").style.color = "#4f46e5";
+  document.getElementById("tagInput").value = "";
+  document.getElementById("progress-status").innerText = "";
+  document.getElementById("rename-upload-container").classList.add("hidden");
+  document.getElementById("uploadFileNameInput").value = "";
+  currentUploadTags = [];
+  renderUploadTags();
+}
 
-  if (btnUpload) btnUpload.onclick = handleUpload;
-  if (btnRefresh) btnRefresh.onclick = loadFilesFromFirebase;
-  if (btnSync) btnSync.onclick = handleSync;
-
+function initializeAppLogic() {
+  if (typeof firebase !== "undefined" && !firebase.apps.length)
+    firebase.initializeApp(CONFIG.FIREBASE);
+  document.getElementById("upload_btn").onclick = handleUpload;
+  document.getElementById("sync_btn").onclick = handleSync;
   loadFilesFromFirebase();
 }
 
-// --- CÁC HÀM XỬ LÝ ---
+function addTagToList(inputElement) {
+  let val = inputElement.value.trim();
+  if (!val) return;
+  val = val.charAt(0).toUpperCase() + val.slice(1);
+  if (!currentUploadTags.includes(val)) {
+    currentUploadTags.push(val);
+    renderUploadTags();
+  }
+  inputElement.value = "";
+  inputElement.focus();
+}
+
+function renderUploadTags() {
+  const container = document.getElementById("selected-tags-container");
+  container.innerHTML = "";
+  currentUploadTags.forEach((tag, index) => {
+    const chip = document.createElement("div");
+    chip.className = "upload-tag-chip";
+    chip.innerHTML = `${tag} <i class="fa-solid fa-xmark" onclick="removeUploadTag(${index})"></i>`;
+    container.appendChild(chip);
+  });
+}
+
+window.removeUploadTag = function (index) {
+  currentUploadTags.splice(index, 1);
+  renderUploadTags();
+};
 
 async function handleUpload() {
   const fileInput = document.getElementById("fileInput");
   const file = fileInput.files[0];
+  const nameInput = document.getElementById("uploadFileNameInput");
   const statusDiv = document.getElementById("progress-status");
 
-  if (!file) return alert("Vui lòng chọn file trước!");
+  if (!file) return alert("Vui lòng chọn file!");
 
-  statusDiv.innerText = "⏳ Đang kết nối máy chủ...";
+  const tagInput = document.getElementById("tagInput");
+  if (tagInput.value.trim()) addTagToList(tagInput);
+
+  let finalTagString =
+    currentUploadTags.length > 0 ? currentUploadTags.join(", ") : "Khác";
+  let finalFileName = nameInput.value.trim() || file.name;
+
+  statusDiv.innerText = "⏳ Đang tải lên Drive...";
   statusDiv.style.color = "#e67e22";
 
   try {
     const tokenRes = await fetch(CONFIG.GET_TOKEN_URL);
-    if (!tokenRes.ok)
-      throw new Error("Lỗi Netlify lấy token (Kiểm tra link API)");
-    const tokenData = await tokenRes.json();
-    const accessToken = tokenData.accessToken;
-
-    statusDiv.innerText = "⏳ Đang upload lên Google Drive...";
+    if (!tokenRes.ok) throw new Error("Lỗi Token");
+    const { accessToken } = await tokenRes.json();
 
     const metadata = {
-      name: file.name,
+      name: finalFileName,
       mimeType: file.type,
       parents: [CONFIG.FOLDER_ID],
     };
-
     const form = new FormData();
     form.append(
       "metadata",
@@ -128,7 +224,7 @@ async function handleUpload() {
     );
     form.append("file", file);
 
-    const response = await fetch(
+    const upRes = await fetch(
       "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink",
       {
         method: "POST",
@@ -136,16 +232,33 @@ async function handleUpload() {
         body: form,
       }
     );
-
-    const driveFile = await response.json();
+    const driveFile = await upRes.json();
     if (driveFile.error) throw new Error(driveFile.error.message);
 
     statusDiv.innerText = "💾 Đang lưu Database...";
-    await saveToDatabase(driveFile);
 
-    statusDiv.innerText = "✅ Hoàn tất!";
+    const payload = {
+      fileId: driveFile.id,
+      fileName: driveFile.name,
+      viewLink: driveFile.webViewLink,
+      downloadLink: driveFile.webContentLink,
+      tag: finalTagString,
+      isPinned: false,
+    };
+
+    await fetch(CONFIG.SAVE_DB_URL, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    await patchTagForFile(driveFile.id, finalTagString);
+
+    statusDiv.innerText = "✅ Upload thành công!";
     statusDiv.style.color = "green";
-    fileInput.value = "";
+
+    loadFilesFromFirebase();
+    setTimeout(() => {
+      document.getElementById("upload-modal-overlay").classList.add("hidden");
+    }, 1000);
   } catch (error) {
     console.error(error);
     statusDiv.innerText = "❌ Lỗi: " + error.message;
@@ -153,131 +266,377 @@ async function handleUpload() {
   }
 }
 
-async function saveToDatabase(fileData) {
-  const payload = {
-    fileId: fileData.id,
-    fileName: fileData.name,
-    viewLink: fileData.webViewLink,
-    downloadLink: fileData.webContentLink,
-  };
-
-  const res = await fetch(CONFIG.SAVE_DB_URL, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-
-  if (!res.ok) throw new Error("Lỗi lưu Firebase");
-  loadFilesFromFirebase();
-}
-
-function loadFilesFromFirebase() {
-  if (typeof firebase === "undefined") return;
-
+async function patchTagForFile(fileId, tag) {
   const db = firebase.database();
-  const list = document.getElementById("file-list");
-
-  list.innerHTML =
-    '<li style="text-align:center; color:#999">Đang cập nhật...</li>';
-
-  db.ref("files")
-    .once("value")
-    .then((snapshot) => {
-      list.innerHTML = "";
-      const data = snapshot.val();
-
-      if (!data) {
-        list.innerHTML =
-          '<li style="text-align:center; padding:10px; color:#999">Chưa có file nào</li>';
-        return;
-      }
-
-      const entries = Object.entries(data).reverse();
-
-      entries.forEach(([key, file]) => {
-        const li = document.createElement("li");
-        li.className = "file-item";
-        li.innerHTML = `
-                <span class="file-name" title="${file.fileName}">${file.fileName}</span>
-                <div class="file-actions">
-                    <a href="${file.viewLink}" target="_blank" class="link-btn view-link" title="Xem">👁️</a>
-                    <a href="${file.downloadLink}" class="link-btn down-link" title="Tải xuống">⬇️</a>
-                    <button class="link-btn del-link" title="Xóa" 
-                        id="btn-del-${key}"
-                        onclick="handleDelete('${key}', '${file.fileId}', '${file.fileName}')">🗑️</button>
-                </div>
-            `;
-        list.appendChild(li);
-      });
-    })
-    .catch((err) => {
-      console.error(err);
-      list.innerHTML =
-        '<li style="color:red; text-align:center">Lỗi tải danh sách</li>';
-    });
-}
-
-async function handleDelete(firebaseKey, googleFileId, fileName) {
-  if (!confirm(`Bạn có chắc muốn xóa file "${fileName}" không?`)) return;
-
-  const btnDelete = document.getElementById(`btn-del-${firebaseKey}`);
-  if (btnDelete) {
-    btnDelete.innerText = "⏳";
-    btnDelete.disabled = true;
-  }
-
-  try {
-    const res = await fetch(CONFIG.DELETE_FILE_URL, {
-      method: "POST",
-      body: JSON.stringify({ fileId: googleFileId }),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      console.warn("Drive delete warning:", errText);
-    }
-
-    await firebase
-      .database()
-      .ref("files/" + firebaseKey)
-      .remove();
-    loadFilesFromFirebase();
-    alert("✅ Đã xóa thành công!");
-  } catch (error) {
-    console.error(error);
-    alert("❌ Lỗi: " + error.message);
-    if (btnDelete) {
-      btnDelete.innerText = "🗑️";
-      btnDelete.disabled = false;
-    }
+  const snapshot = await db
+    .ref("files")
+    .orderByChild("fileId")
+    .equalTo(fileId)
+    .once("value");
+  const data = snapshot.val();
+  if (data) {
+    const key = Object.keys(data)[0];
+    await db.ref(`files/${key}`).update({ tag: tag });
   }
 }
 
 async function handleSync() {
   const btnSync = document.getElementById("sync_btn");
-  const originalText = btnSync.innerText;
-
-  if (!confirm("Đồng bộ lại danh sách từ Drive?")) return;
-
-  btnSync.innerText = "⏳...";
+  const originalHTML = btnSync.innerHTML;
+  btnSync.innerHTML =
+    '<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...';
   btnSync.disabled = true;
-
   try {
+    const snapshot = await firebase.database().ref("files").once("value");
+    const currentData = snapshot.val() || {};
+    const metaMap = {};
+    Object.values(currentData).forEach((f) => {
+      if (f.fileId) {
+        metaMap[f.fileId] = { tag: f.tag, isPinned: f.isPinned || false };
+      }
+    });
+
     const res = await fetch(CONFIG.SYNC_URL, {
       method: "POST",
       body: JSON.stringify({ folderId: CONFIG.FOLDER_ID }),
     });
+    if (!res.ok) throw new Error("Lỗi Sync");
 
-    if (!res.ok) throw new Error("Lỗi Server Sync");
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
+    const newSnapshot = await firebase.database().ref("files").once("value");
+    const newData = newSnapshot.val() || {};
+    const updates = {};
 
-    alert(`✅ Đồng bộ xong! (${data.count} file)`);
+    Object.keys(newData).forEach((key) => {
+      const file = newData[key];
+      const oldMeta = metaMap[file.fileId];
+      if (oldMeta) {
+        let needsUpdate = false;
+        let updateData = {};
+        if ((!file.tag || file.tag === "Khác") && oldMeta.tag) {
+          updateData[`files/${key}/tag`] = oldMeta.tag;
+          needsUpdate = true;
+        }
+        if (oldMeta.isPinned) {
+          updateData[`files/${key}/isPinned`] = true;
+          needsUpdate = true;
+        }
+        if (needsUpdate) Object.assign(updates, updateData);
+      }
+    });
+
+    if (Object.keys(updates).length > 0)
+      await firebase.database().ref().update(updates);
     loadFilesFromFirebase();
   } catch (error) {
-    console.error(error);
-    alert("❌ Lỗi: " + error.message);
+    alert("Lỗi: " + error.message);
   } finally {
-    btnSync.innerText = originalText;
+    btnSync.innerHTML = originalHTML;
     btnSync.disabled = false;
+  }
+}
+
+function loadFilesFromFirebase() {
+  const db = firebase.database();
+  const tbody = document.getElementById("file-list");
+  tbody.innerHTML =
+    '<tr><td colspan="3" class="loading-text">Đang tải dữ liệu...</td></tr>';
+  db.ref("files")
+    .once("value")
+    .then((snapshot) => {
+      const data = snapshot.val();
+      ALL_FILES_DATA = [];
+      if (!data) {
+        tbody.innerHTML =
+          '<tr><td colspan="3" style="text-align:center; padding:20px;">Chưa có file nào</td></tr>';
+        updateFilters([], []);
+        return;
+      }
+      Object.entries(data).forEach(([key, file]) => {
+        ALL_FILES_DATA.push({
+          key: key,
+          ...file,
+          tag: file.tag || "Khác",
+          isPinned: file.isPinned || false,
+        });
+      });
+      ALL_FILES_DATA.reverse();
+      updateDatalist(ALL_FILES_DATA);
+      updateFilters(ALL_FILES_DATA);
+      renderFilesTable();
+    });
+}
+
+function getUniqueTags(files) {
+  const tagSet = new Set();
+  files.forEach((f) =>
+    f.tag
+      .split(",")
+      .map((t) => t.trim())
+      .forEach((t) => tagSet.add(t))
+  );
+  return Array.from(tagSet).sort();
+}
+
+function updateDatalist(files) {
+  const datalist = document.getElementById("existing-tags");
+  const tags = getUniqueTags(files);
+  datalist.innerHTML = "";
+  tags.forEach((tag) => {
+    const option = document.createElement("option");
+    option.value = tag;
+    datalist.appendChild(option);
+  });
+}
+
+function updateFilters(files) {
+  const tagContainer = document.getElementById("tag-filter-list");
+  const tags = getUniqueTags(files);
+  tagContainer.innerHTML = `<label class="filter-item"><input type="checkbox" value="ALL" class="tag-cb" checked> Tất cả</label>`;
+  tags.forEach((tag) => {
+    tagContainer.innerHTML += `<label class="filter-item"><input type="checkbox" value="${tag}" class="tag-cb"> ${tag}</label>`;
+  });
+  const typeContainer = document.getElementById("type-filter-list");
+  const types = new Set(files.map((f) => getFileType(f.fileName).name));
+  typeContainer.innerHTML = `<label class="filter-item"><input type="checkbox" value="ALL" class="type-cb" checked> Tất cả</label>`;
+  types.forEach((type) => {
+    typeContainer.innerHTML += `<label class="filter-item"><input type="checkbox" value="${type}" class="type-cb"> ${type}</label>`;
+  });
+  setupFilterEvents();
+}
+
+function setupFilterEvents() {
+  document.querySelectorAll(".tag-cb").forEach((cb) =>
+    cb.addEventListener("change", (e) => {
+      handleCheckboxGroup(e.target, ".tag-cb", ACTIVE_TAGS);
+      renderFilesTable(document.getElementById("search-input").value);
+    })
+  );
+  document.querySelectorAll(".type-cb").forEach((cb) =>
+    cb.addEventListener("change", (e) => {
+      handleCheckboxGroup(e.target, ".type-cb", ACTIVE_TYPES);
+      renderFilesTable(document.getElementById("search-input").value);
+    })
+  );
+}
+
+function handleCheckboxGroup(target, selector, activeSet) {
+  const val = target.value;
+  const allCb = document.querySelector(`${selector}[value="ALL"]`);
+  if (val === "ALL") {
+    if (target.checked) {
+      document.querySelectorAll(selector).forEach((c) => {
+        if (c.value !== "ALL") c.checked = false;
+      });
+      activeSet.clear();
+      activeSet.add("ALL");
+    } else target.checked = true;
+  } else {
+    allCb.checked = false;
+    activeSet.delete("ALL");
+    if (target.checked) activeSet.add(val);
+    else activeSet.delete(val);
+    if (activeSet.size === 0) {
+      allCb.checked = true;
+      activeSet.add("ALL");
+    }
+  }
+}
+
+function getFileType(fileName) {
+  if (fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i))
+    return { name: "Hình ảnh", icon: "fa-file-image" };
+  if (fileName.match(/\.(pdf)$/i)) return { name: "PDF", icon: "fa-file-pdf" };
+  if (fileName.match(/\.(doc|docx)$/i))
+    return { name: "Word", icon: "fa-file-word" };
+  if (fileName.match(/\.(xls|xlsx|csv)$/i))
+    return { name: "Excel", icon: "fa-file-excel" };
+  if (fileName.match(/\.(ppt|pptx)$/i))
+    return { name: "PowerPoint", icon: "fa-file-powerpoint" };
+  if (fileName.match(/\.(zip|rar|7z)$/i))
+    return { name: "Nén", icon: "fa-file-zipper" };
+  return { name: "Khác", icon: "fa-file" };
+}
+
+function renderFilesTable(searchText = "") {
+  const tbody = document.getElementById("file-list");
+  tbody.innerHTML = "";
+
+  let filtered = ALL_FILES_DATA.filter((file) => {
+    const fileType = getFileType(file.fileName).name;
+    const fileTags = file.tag.split(",").map((t) => t.trim());
+    const matchTag =
+      ACTIVE_TAGS.has("ALL") || fileTags.some((t) => ACTIVE_TAGS.has(t));
+    const matchType = ACTIVE_TYPES.has("ALL") || ACTIVE_TYPES.has(fileType);
+    const matchSearch = file.fileName
+      .toLowerCase()
+      .includes(searchText.toLowerCase());
+    return matchTag && matchType && matchSearch;
+  });
+
+  filtered.sort((a, b) => {
+    if (a.isPinned && !b.isPinned) return -1;
+    if (!a.isPinned && b.isPinned) return 1;
+
+    switch (currentSortMode) {
+      case "name-asc":
+        return a.fileName.localeCompare(b.fileName);
+      case "name-desc":
+        return b.fileName.localeCompare(a.fileName);
+      case "type":
+        const typeA = getFileType(a.fileName).name;
+        const typeB = getFileType(b.fileName).name;
+        return typeA.localeCompare(typeB);
+      case "tag":
+        return a.tag.localeCompare(b.tag);
+      case "newest":
+      default:
+        return 0;
+    }
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML =
+      '<tr><td colspan="3" style="text-align:center; padding:20px; color:#999">Không có dữ liệu</td></tr>';
+    return;
+  }
+
+  filtered.forEach((file) => {
+    const typeInfo = getFileType(file.fileName);
+    const tagsArr = file.tag.split(",").map((t) => t.trim());
+    let tagsHTML = `<div class="tags-cell" onclick="enableEditTag('${file.key}', '${file.tag}')">`;
+    tagsArr.forEach(
+      (t) =>
+        (tagsHTML += `<span class="tag-badge ${
+          t === "Khác" ? "no-tag" : ""
+        }">${t}</span>`)
+    );
+    tagsHTML += `</div>`;
+
+    const pinIconClass = file.isPinned
+      ? "fa-solid fa-star"
+      : "fa-regular fa-star";
+    const pinActiveClass = file.isPinned ? "active" : "";
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+            <td>
+                <div class="file-name-cell" id="name-cell-${file.key}">
+                    <i class="fa-solid ${typeInfo.icon} file-icon"></i>
+                    <span class="file-name-text" title="${file.fileName}">
+                        <a href="${file.viewLink}" target="_blank" style="text-decoration:none; color:inherit;">${file.fileName}</a>
+                    </span>
+                    <div class="inline-actions">
+                        <i class="fa-solid fa-pen action-icon-btn btn-rename" onclick="enableEditName('${file.key}', '${file.fileId}', '${file.fileName}')" title="Đổi tên"></i>
+                        <a href="${file.downloadLink}" class="action-icon-btn btn-download" title="Tải xuống"><i class="fa-solid fa-download"></i></a>
+                        <button class="action-icon-btn btn-delete" title="Xóa" id="btn-del-${file.key}" onclick="handleDelete('${file.key}', '${file.fileId}', '${file.fileName}')"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>
+            </td>
+            <td>
+                <div class="pin-btn ${pinActiveClass}" onclick="togglePin('${file.key}', ${file.isPinned})">
+                    <i class="${pinIconClass}"></i>
+                </div>
+            </td>
+            <td id="tag-cell-${file.key}">
+                ${tagsHTML}
+            </td>
+        `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function togglePin(key, currentStatus) {
+  const newStatus = !currentStatus;
+  await firebase.database().ref(`files/${key}`).update({ isPinned: newStatus });
+  const file = ALL_FILES_DATA.find((f) => f.key === key);
+  if (file) file.isPinned = newStatus;
+  renderFilesTable(document.getElementById("search-input").value);
+}
+
+function enableEditName(key, fileId, currentName) {
+  const cell = document.getElementById(`name-cell-${key}`);
+  cell.innerHTML = `
+        <i class="fa-solid ${getFileType(currentName).icon} file-icon"></i>
+        <input type="text" class="edit-input" value="${currentName}" id="input-name-${key}">
+    `;
+  const input = document.getElementById(`input-name-${key}`);
+  input.focus();
+  const saveHandler = () => saveNameEdit(key, fileId, input.value, currentName);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") input.blur();
+  });
+  input.addEventListener("blur", saveHandler);
+}
+
+async function saveNameEdit(key, fileId, newName, oldName) {
+  newName = newName.trim();
+  if (!newName || newName === oldName) {
+    renderFilesTable(document.getElementById("search-input").value);
+    return;
+  }
+  const cell = document.getElementById(`name-cell-${key}`);
+  cell.innerHTML = `<span style="color:#e67e22; font-size:0.9rem">⏳ Đang lưu...</span>`;
+  try {
+    const tokenRes = await fetch(CONFIG.GET_TOKEN_URL);
+    const { accessToken } = await tokenRes.json();
+    await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ name: newName }),
+    });
+    await firebase.database().ref(`files/${key}`).update({ fileName: newName });
+    const file = ALL_FILES_DATA.find((f) => f.key === key);
+    if (file) file.fileName = newName;
+    updateFilters(ALL_FILES_DATA);
+    renderFilesTable(document.getElementById("search-input").value);
+  } catch (error) {
+    alert("❌ Lỗi đổi tên: " + error.message);
+    renderFilesTable(document.getElementById("search-input").value);
+  }
+}
+
+function enableEditTag(key, currentTag) {
+  const cell = document.getElementById(`tag-cell-${key}`);
+  cell.innerHTML = `<input type="text" class="edit-input" value="${currentTag}" onblur="saveTagEdit('${key}', this.value)" onkeydown="if(event.key==='Enter') this.blur()" placeholder="Tag1, Tag2...">`;
+  cell.querySelector("input").focus();
+}
+
+async function saveTagEdit(key, newTag) {
+  newTag = newTag.trim();
+  if (!newTag) newTag = "Khác";
+  const tagsFormatted = newTag
+    .split(",")
+    .map((t) => t.trim().charAt(0).toUpperCase() + t.trim().slice(1))
+    .join(", ");
+  await firebase.database().ref(`files/${key}`).update({ tag: tagsFormatted });
+  const file = ALL_FILES_DATA.find((f) => f.key === key);
+  if (file) file.tag = tagsFormatted;
+  updateDatalist(ALL_FILES_DATA);
+  updateFilters(ALL_FILES_DATA);
+  renderFilesTable(document.getElementById("search-input").value);
+}
+
+async function handleDelete(key, fileId, fileName) {
+  if (!confirm(`Bạn có chắc chắn muốn xóa file:\n"${fileName}"?`)) return;
+  const btn = document.getElementById(`btn-del-${key}`);
+  if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner"></i>';
+  try {
+    await fetch(CONFIG.DELETE_FILE_URL, {
+      method: "POST",
+      body: JSON.stringify({ fileId }),
+    });
+    await firebase
+      .database()
+      .ref("files/" + key)
+      .remove();
+    ALL_FILES_DATA = ALL_FILES_DATA.filter((f) => f.key !== key);
+    renderFilesTable();
+    updateFilters(ALL_FILES_DATA);
+  } catch (e) {
+    alert("Lỗi xóa: " + e.message);
+    if (btn) btn.innerHTML = '<i class="fa-solid fa-trash"></i>';
   }
 }
