@@ -1,33 +1,46 @@
 // ==========================================
-// 1. CẤU HÌNH (BẠN ĐIỀN THÔNG TIN VÀO ĐÂY)
+// 1. CẤU HÌNH (HÃY ĐIỀN 3 DÒNG ĐẦU TIÊN)
 // ==========================================
 const CONFIG = {
-  CLIENT_ID: "YOUR_CLIENT_ID", // Copy từ Google Cloud (Đuôi ...apps.googleusercontent.com)
-  API_KEY: "YOUR_API_KEY", // Copy từ Google Cloud (Bắt đầu bằng AIza...)
+  // ⚠️ BẮT BUỘC THAY BẰNG MÃ CỦA BẠN
+  CLIENT_ID:
+    "511529666068-k3efqgqos81laubpval0ibgqjihas4nj.apps.googleusercontent.com",
+  API_KEY: "AIzaSyAs51r-N13B7iFeTV1lyR5D_doShhnRf-s",
 
-  // URL Netlify Function sau khi deploy (Lúc test dưới máy thì dùng localhost)
-  // Ví dụ: 'https://ten-app-cua-ban.netlify.app/.netlify/functions/saveFile'
-  NETLIFY_URL: "YOUR_NETLIFY_URL/.netlify/functions/saveFile",
+  // URL function sau khi deploy (Ví dụ: https://my-app.netlify.app/.netlify/functions/saveFile)
+  // Nếu chạy localhost thì để trống hoặc localhost, nhưng quan trọng nhất là lúc Deploy
+  NETLIFY_URL: "https://dnduc-drive.netlify.app/.netlify/functions/saveFile",
 
   FIREBASE: {
-    // Copy từ Firebase Console > Project Settings
-    apiKey: "YOUR_FIREBASE_API_KEY",
-    authDomain: "YOUR_PROJECT.firebaseapp.com",
-    databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT.appspot.com",
-    messagingSenderId: "...",
-    appId: "...",
+    apiKey: "AIzaSyDOUCC56svyZ5pGZV7z160PW4Z8rJ01jdw",
+    authDomain: "dnduc-drive.firebaseapp.com",
+    databaseURL:
+      "https://dnduc-drive-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "dnduc-drive",
+    storageBucket: "dnduc-drive.firebasestorage.app",
+    messagingSenderId: "875885392954",
+    appId: "1:875885392954:web:14fbd18df62155bf6b7103",
+    measurementId: "G-455HFS41MH",
   },
 };
 
 // ==========================================
-// 2. KHỞI TẠO
+// 2. LOGIC CHƯƠNG TRÌNH
 // ==========================================
-firebase.initializeApp(CONFIG.FIREBASE);
-const db = firebase.database();
 
-// Biến Google API
+// Đợi trang load xong mới chạy logic DOM
+document.addEventListener("DOMContentLoaded", () => {
+  firebase.initializeApp(CONFIG.FIREBASE);
+  const db = firebase.database();
+
+  // Gán sự kiện cho các nút bấm
+  document.getElementById("authorize_button").onclick = handleAuthClick;
+  document.getElementById("signout_button").onclick = handleSignoutClick;
+  document.getElementById("upload_btn").onclick = handleUpload;
+  document.getElementById("refresh_btn").onclick = loadFilesFromFirebase;
+});
+
+// Biến Global cần thiết cho Google Script gọi lại
 const DISCOVERY_DOC =
   "https://www.googleapis.com/discovery/v1/apis/drive/v3/rest";
 const SCOPES = "https://www.googleapis.com/auth/drive.file";
@@ -35,9 +48,7 @@ let tokenClient;
 let gapiInited = false;
 let gisInited = false;
 
-// ==========================================
-// 3. XỬ LÝ GOOGLE AUTH
-// ==========================================
+// --- Google Auth Functions ---
 function gapiLoaded() {
   gapi.load("client", async () => {
     await gapi.client.init({
@@ -45,7 +56,7 @@ function gapiLoaded() {
       discoveryDocs: [DISCOVERY_DOC],
     });
     gapiInited = true;
-    checkAuthLoaded();
+    maybeEnableButtons();
   });
 }
 
@@ -53,70 +64,60 @@ function gisLoaded() {
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CONFIG.CLIENT_ID,
     scope: SCOPES,
-    callback: "",
+    callback: "", // Sẽ được gán khi click nút
   });
   gisInited = true;
-  checkAuthLoaded();
+  maybeEnableButtons();
 }
 
-function checkAuthLoaded() {
+function maybeEnableButtons() {
   if (gapiInited && gisInited) {
-    // Logic kiểm tra nếu đã đăng nhập thì hiện app luôn (tùy chọn)
+    // Kiểm tra nếu đã có session từ trước (Tùy chọn)
+    // Hiển thị nút đăng nhập
   }
 }
 
-// Nút Đăng nhập
-document.getElementById("authorize_button").onclick = () => {
+function handleAuthClick() {
   tokenClient.callback = async (resp) => {
-    if (resp.error) throw resp;
-    toggleViews(true); // Hiện giao diện App
-    loadFilesFromFirebase(); // Tải danh sách
+    if (resp.error) {
+      console.error(resp);
+      alert("Lỗi đăng nhập: " + JSON.stringify(resp));
+      return;
+    }
+    toggleViews(true);
+    loadFilesFromFirebase();
   };
 
-  // Check token cũ hoặc xin mới
   if (gapi.client.getToken() === null) {
     tokenClient.requestAccessToken({ prompt: "consent" });
   } else {
     tokenClient.requestAccessToken({ prompt: "" });
   }
-};
+}
 
-// Nút Đăng xuất
-document.getElementById("signout_button").onclick = () => {
+function handleSignoutClick() {
   const token = gapi.client.getToken();
   if (token !== null) {
     google.accounts.oauth2.revoke(token.access_token);
     gapi.client.setToken("");
-    toggleViews(false); // Ẩn App, hiện nút login
+    toggleViews(false);
   }
-};
+}
 
-// ==========================================
-// 4. XỬ LÝ UPLOAD (QUAN TRỌNG)
-// ==========================================
-document.getElementById("upload_btn").onclick = async () => {
+// --- Upload Logic ---
+async function handleUpload() {
   const fileInput = document.getElementById("fileInput");
   const file = fileInput.files[0];
   const statusDiv = document.getElementById("progress-status");
 
-  if (!file) {
-    alert("Vui lòng chọn file trước!");
-    return;
-  }
+  if (!file) return alert("Vui lòng chọn file trước!");
 
   statusDiv.innerText = "⏳ Đang upload lên Google Drive...";
-  statusDiv.style.color = "#e67e22"; // Màu cam
+  statusDiv.style.color = "#e67e22";
 
   try {
     const accessToken = gapi.client.getToken().access_token;
-
-    // Metadata cho Drive
-    const metadata = {
-      name: file.name,
-      mimeType: file.type,
-    };
-
-    // Tạo form multipart
+    const metadata = { name: file.name, mimeType: file.type };
     const form = new FormData();
     form.append(
       "metadata",
@@ -124,7 +125,6 @@ document.getElementById("upload_btn").onclick = async () => {
     );
     form.append("file", file);
 
-    // Gửi request lên API Google Drive
     const response = await fetch(
       "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink",
       {
@@ -135,26 +135,24 @@ document.getElementById("upload_btn").onclick = async () => {
     );
 
     const driveFile = await response.json();
-
     if (driveFile.error) throw new Error(driveFile.error.message);
 
     statusDiv.innerText = "💾 Upload xong. Đang lưu vào Database...";
 
-    // GỌI NETLIFY FUNCTION ĐỂ LƯU DB
+    // Gửi sang Netlify Function
     await saveToDatabase(driveFile);
 
     statusDiv.innerText = "✅ Hoàn tất!";
     statusDiv.style.color = "green";
-    fileInput.value = ""; // Reset ô chọn file
+    fileInput.value = "";
   } catch (error) {
     console.error(error);
     statusDiv.innerText = "❌ Lỗi: " + error.message;
     statusDiv.style.color = "red";
   }
-};
+}
 
 async function saveToDatabase(fileData) {
-  // Gửi dữ liệu file sang Netlify Function
   const payload = {
     fileId: fileData.id,
     fileName: fileData.name,
@@ -162,19 +160,22 @@ async function saveToDatabase(fileData) {
     downloadLink: fileData.webContentLink,
   };
 
-  await fetch(CONFIG.NETLIFY_URL, {
+  // Gọi Backend
+  const res = await fetch(CONFIG.NETLIFY_URL, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 
-  // Refresh lại danh sách ngay
+  if (!res.ok) {
+    throw new Error("Lỗi khi gọi Netlify Function: " + res.statusText);
+  }
+
   loadFilesFromFirebase();
 }
 
-// ==========================================
-// 5. XỬ LÝ DANH SÁCH & UI
-// ==========================================
+// --- UI & Helpers ---
 function loadFilesFromFirebase() {
+  const db = firebase.database(); // Lấy lại instance
   const list = document.getElementById("file-list");
 
   db.ref("files")
@@ -188,26 +189,21 @@ function loadFilesFromFirebase() {
           '<li style="text-align:center; padding:10px; color:#999">Chưa có file nào</li>';
         return;
       }
-
-      // Convert object sang array và đảo ngược để file mới nhất lên đầu
       const files = Object.values(data).reverse();
-
       files.forEach((file) => {
         const li = document.createElement("li");
         li.className = "file-item";
         li.innerHTML = `
-                <span class="file-name" title="${file.fileName}">${file.fileName}</span>
-                <div class="file-actions">
-                    <a href="${file.viewLink}" target="_blank" class="link-btn view-link">👁️ Mở</a>
-                    <a href="${file.downloadLink}" class="link-btn down-link">⬇️ Tải</a>
-                </div>
-            `;
+            <span class="file-name" title="${file.fileName}">${file.fileName}</span>
+            <div class="file-actions">
+                <a href="${file.viewLink}" target="_blank" class="link-btn view-link">👁️ Mở</a>
+                <a href="${file.downloadLink}" class="link-btn down-link">⬇️ Tải</a>
+            </div>
+        `;
         list.appendChild(li);
       });
     });
 }
-
-document.getElementById("refresh_btn").onclick = loadFilesFromFirebase;
 
 function toggleViews(isLoggedIn) {
   if (isLoggedIn) {
