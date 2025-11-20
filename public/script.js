@@ -1,19 +1,18 @@
 // ==========================================
 // 1. CẤU HÌNH & BẢO MẬT
 // ==========================================
-const MY_PASSWORD = "123456"; // <--- ĐỔI MẬT KHẨU Ở ĐÂY
+const MY_PASSWORD = "321321"; // Mật khẩu của bạn
 
 const CONFIG = {
-  // Đường dẫn đến các Netlify Functions (Backend)
-  GET_TOKEN_URL: "/.netlify/functions/getToken",
-  SAVE_DB_URL: "/.netlify/functions/saveFile",
-  DELETE_FILE_URL: "/.netlify/functions/deleteFile",
-  SYNC_URL: "/.netlify/functions/syncFiles",
+  // 👇 QUAN TRỌNG: Phải dùng đường dẫn đầy đủ tới Netlify
+  GET_TOKEN_URL: "https://dnduc-drive.netlify.app/.netlify/functions/getToken",
+  SAVE_DB_URL: "https://dnduc-drive.netlify.app/.netlify/functions/saveFile",
+  DELETE_FILE_URL:
+    "https://dnduc-drive.netlify.app/.netlify/functions/deleteFile",
+  SYNC_URL: "https://dnduc-drive.netlify.app/.netlify/functions/syncFiles",
 
-  // ID thư mục trên Google Drive
   FOLDER_ID: "1i__DIWWEX7HYemtyZ5wqwaYcYfnW50a3",
 
-  // Cấu hình Firebase
   FIREBASE: {
     apiKey: "AIzaSyDOUCC56svyZ5pGZV7z160PW4Z8rJ01jdw",
     authDomain: "dnduc-drive.firebaseapp.com",
@@ -37,60 +36,54 @@ document.addEventListener("DOMContentLoaded", () => {
   const loginBtn = document.getElementById("login-btn");
   const errorMsg = document.getElementById("error-message");
 
-  // 1. Kiểm tra xem đã đăng nhập trong phiên này chưa
+  // Kiểm tra session
   if (sessionStorage.getItem("myDrive_isLoggedIn") === "true") {
     unlockApp();
   } else {
-    // Nếu chưa, focus vào ô nhập password
     if (passwordInput) passwordInput.focus();
   }
 
-  // 2. Xử lý sự kiện click nút Đăng nhập
+  // Sự kiện click nút Đăng nhập
   if (loginBtn) {
     loginBtn.addEventListener("click", checkLogin);
   }
-
-  // 3. Xử lý sự kiện nhấn phím Enter
+  // Sự kiện nhấn Enter
   if (passwordInput) {
     passwordInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") checkLogin();
     });
   }
 
-  // Hàm kiểm tra mật khẩu
   function checkLogin() {
     if (passwordInput.value === MY_PASSWORD) {
       sessionStorage.setItem("myDrive_isLoggedIn", "true");
       unlockApp();
     } else {
-      errorMsg.style.display = "block"; // Hiện thông báo lỗi
+      errorMsg.style.display = "block";
       passwordInput.value = "";
       passwordInput.focus();
     }
   }
 
-  // Hàm mở khóa ứng dụng
   function unlockApp() {
     if (loginOverlay) loginOverlay.style.display = "none";
-    if (mainApp) mainApp.style.display = "flex"; // Hoặc block tùy layout
+    if (mainApp) mainApp.style.display = "flex";
 
-    // Sau khi giao diện hiện lên, mới chạy logic kết nối Firebase
+    // Chạy logic chính sau khi mở khóa
     initializeAppLogic();
   }
 });
 
 // ==========================================
-// 3. LOGIC CHÍNH CỦA APP (CHỈ CHẠY KHI ĐÃ LOGIN)
+// 3. LOGIC CHÍNH CỦA APP
 // ==========================================
 function initializeAppLogic() {
-  console.log("App started...");
+  console.log("App connecting to Netlify Functions...");
 
-  // 1. Khởi tạo Firebase nếu chưa có
   if (typeof firebase !== "undefined" && !firebase.apps.length) {
     firebase.initializeApp(CONFIG.FIREBASE);
   }
 
-  // 2. Gán sự kiện cho các nút chức năng (Upload, Refresh, Sync)
   const btnUpload = document.getElementById("upload_btn");
   const btnRefresh = document.getElementById("refresh_btn");
   const btnSync = document.getElementById("sync_btn");
@@ -99,13 +92,11 @@ function initializeAppLogic() {
   if (btnRefresh) btnRefresh.onclick = loadFilesFromFirebase;
   if (btnSync) btnSync.onclick = handleSync;
 
-  // 3. Tải danh sách file lần đầu
   loadFilesFromFirebase();
 }
 
-// --- CÁC HÀM XỬ LÝ (UPLOAD, SYNC, DELETE...) ---
+// --- CÁC HÀM XỬ LÝ ---
 
-// Hàm Upload
 async function handleUpload() {
   const fileInput = document.getElementById("fileInput");
   const file = fileInput.files[0];
@@ -117,9 +108,9 @@ async function handleUpload() {
   statusDiv.style.color = "#e67e22";
 
   try {
-    // Lấy token từ Netlify Function
     const tokenRes = await fetch(CONFIG.GET_TOKEN_URL);
-    if (!tokenRes.ok) throw new Error("Lỗi Netlify lấy token");
+    if (!tokenRes.ok)
+      throw new Error("Lỗi Netlify lấy token (Kiểm tra link API)");
     const tokenData = await tokenRes.json();
     const accessToken = tokenData.accessToken;
 
@@ -131,7 +122,6 @@ async function handleUpload() {
       parents: [CONFIG.FOLDER_ID],
     };
 
-    // Tạo Form Data để gửi file
     const form = new FormData();
     form.append(
       "metadata",
@@ -139,7 +129,6 @@ async function handleUpload() {
     );
     form.append("file", file);
 
-    // Gửi lên Google Drive API
     const response = await fetch(
       "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink",
       {
@@ -157,7 +146,7 @@ async function handleUpload() {
 
     statusDiv.innerText = "✅ Hoàn tất!";
     statusDiv.style.color = "green";
-    fileInput.value = ""; // Xóa file đã chọn trong input
+    fileInput.value = "";
   } catch (error) {
     console.error(error);
     statusDiv.innerText = "❌ Lỗi: " + error.message;
@@ -165,7 +154,6 @@ async function handleUpload() {
   }
 }
 
-// Hàm lưu thông tin file vào Firebase
 async function saveToDatabase(fileData) {
   const payload = {
     fileId: fileData.id,
@@ -183,9 +171,8 @@ async function saveToDatabase(fileData) {
   loadFilesFromFirebase();
 }
 
-// Hàm tải danh sách từ Firebase về giao diện
 function loadFilesFromFirebase() {
-  if (typeof firebase === "undefined") return; // Phòng hờ lỗi chưa load thư viện
+  if (typeof firebase === "undefined") return;
 
   const db = firebase.database();
   const list = document.getElementById("file-list");
@@ -205,7 +192,7 @@ function loadFilesFromFirebase() {
         return;
       }
 
-      const entries = Object.entries(data).reverse(); // Đảo ngược để file mới nhất lên đầu
+      const entries = Object.entries(data).reverse();
 
       entries.forEach(([key, file]) => {
         const li = document.createElement("li");
@@ -230,15 +217,8 @@ function loadFilesFromFirebase() {
     });
 }
 
-// Hàm xóa file
 async function handleDelete(firebaseKey, googleFileId, fileName) {
-  if (
-    !confirm(
-      `Bạn có chắc muốn xóa file "${fileName}" không?\n(Hành động này sẽ xóa vĩnh viễn trên Google Drive)`
-    )
-  ) {
-    return;
-  }
+  if (!confirm(`Bạn có chắc muốn xóa file "${fileName}" không?`)) return;
 
   const btnDelete = document.getElementById(`btn-del-${firebaseKey}`);
   if (btnDelete) {
@@ -247,7 +227,6 @@ async function handleDelete(firebaseKey, googleFileId, fileName) {
   }
 
   try {
-    // 1. Xóa trên Drive qua Netlify Function
     const res = await fetch(CONFIG.DELETE_FILE_URL, {
       method: "POST",
       body: JSON.stringify({ fileId: googleFileId }),
@@ -258,12 +237,10 @@ async function handleDelete(firebaseKey, googleFileId, fileName) {
       console.warn("Drive delete warning:", errText);
     }
 
-    // 2. Xóa trên Firebase
     await firebase
       .database()
       .ref("files/" + firebaseKey)
       .remove();
-
     loadFilesFromFirebase();
     alert("✅ Đã xóa thành công!");
   } catch (error) {
@@ -276,19 +253,13 @@ async function handleDelete(firebaseKey, googleFileId, fileName) {
   }
 }
 
-// Hàm đồng bộ (Sync)
 async function handleSync() {
   const btnSync = document.getElementById("sync_btn");
   const originalText = btnSync.innerText;
 
-  if (
-    !confirm(
-      "Đồng bộ sẽ lấy danh sách từ Google Drive và cập nhật lại Web.\nBạn có muốn tiếp tục?"
-    )
-  )
-    return;
+  if (!confirm("Đồng bộ lại danh sách từ Drive?")) return;
 
-  btnSync.innerText = "⏳ Đang quét...";
+  btnSync.innerText = "⏳...";
   btnSync.disabled = true;
 
   try {
@@ -297,16 +268,15 @@ async function handleSync() {
       body: JSON.stringify({ folderId: CONFIG.FOLDER_ID }),
     });
 
-    if (!res.ok) throw new Error("Lỗi kết nối Server Sync");
-
+    if (!res.ok) throw new Error("Lỗi Server Sync");
     const data = await res.json();
     if (data.error) throw new Error(data.error);
 
-    alert(`✅ Đồng bộ xong! Tìm thấy ${data.count} file.`);
+    alert(`✅ Đồng bộ xong! (${data.count} file)`);
     loadFilesFromFirebase();
   } catch (error) {
     console.error(error);
-    alert("❌ Lỗi đồng bộ: " + error.message);
+    alert("❌ Lỗi: " + error.message);
   } finally {
     btnSync.innerText = originalText;
     btnSync.disabled = false;
