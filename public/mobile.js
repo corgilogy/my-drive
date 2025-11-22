@@ -23,12 +23,12 @@ let ALL_FILES_DATA = [];
 let ACTIVE_TAGS = new Set(["ALL"]);
 let ACTIVE_TYPES = new Set(["ALL"]);
 let currentUploadTags = [];
-let currentSelectedFile = null; // Lưu file đang thao tác
+let currentSelectedFile = null;
+let currentSortMode = "newest";
 
 document.addEventListener("DOMContentLoaded", () => {
   // --- LOGIN LOGIC ---
   const loginScreen = document.getElementById("login-screen");
-  const appScreen = document.getElementById("app-screen");
   const passInput = document.getElementById("pass-input");
   const loginBtn = document.getElementById("btn-login");
 
@@ -52,14 +52,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function showApp() {
     loginScreen.classList.add("hidden");
-    appScreen.classList.remove("hidden");
+    document.getElementById("app-screen").classList.remove("hidden");
     initializeApp();
   }
 
   // --- UI INTERACTIONS ---
+  // Drawer
   const drawer = document.getElementById("app-drawer");
   const overlay = document.getElementById("drawer-overlay");
-
   document.getElementById("menu-btn").onclick = () => {
     drawer.classList.add("open");
     overlay.classList.remove("hidden");
@@ -68,57 +68,92 @@ document.addEventListener("DOMContentLoaded", () => {
     drawer.classList.remove("open");
     overlay.classList.add("hidden");
   };
+  document.getElementById("reset-filter-btn").onclick = () => {
+    ACTIVE_TAGS.clear();
+    ACTIVE_TAGS.add("ALL");
+    ACTIVE_TYPES.clear();
+    ACTIVE_TYPES.add("ALL");
+    updateFiltersUI();
+    renderFileList(document.getElementById("search-input").value);
+  };
 
+  // Upload
   document.getElementById("fab-upload").onclick = () => {
     document.getElementById("upload-modal").classList.remove("hidden");
-    currentUploadTags = [];
-    renderUploadTags();
-    document.getElementById("file-input").value = "";
-    document.getElementById("file-name-display").innerText = "Chọn file...";
+    resetUploadForm();
   };
-
   document.getElementById("cancel-upload").onclick = () =>
     document.getElementById("upload-modal").classList.add("hidden");
+
   document.getElementById("file-input").onchange = (e) => {
-    if (e.target.files.length)
+    if (e.target.files.length) {
       document.getElementById("file-name-display").innerText =
         e.target.files[0].name;
-  };
-
-  // --- TAG INPUT LOGIC ---
-  document.getElementById("add-tag-btn").onclick = addTag;
-
-  function addTag() {
-    const input = document.getElementById("new-tag-input");
-    let val = input.value.trim();
-    if (val) {
-      val = val.charAt(0).toUpperCase() + val.slice(1);
-      if (!currentUploadTags.includes(val)) currentUploadTags.push(val);
-      renderUploadTags();
-      input.value = "";
+      document.getElementById("upload-rename-box").classList.remove("hidden");
+      document.getElementById("upload-filename-input").value =
+        e.target.files[0].name;
     }
-  }
-
+  };
+  document.getElementById("add-tag-btn").onclick = addTag;
   document.getElementById("confirm-upload").onclick = handleUpload;
 
-  // SEARCH
+  // Search & Sort
   document
     .getElementById("search-input")
     .addEventListener("input", (e) => renderFileList(e.target.value));
+  document.getElementById("sort-btn").onclick = () =>
+    document.getElementById("sort-sheet").classList.remove("hidden");
+  document.getElementById("close-sort").onclick = () =>
+    document.getElementById("sort-sheet").classList.add("hidden");
+
+  document.querySelectorAll(".sort-option").forEach((btn) => {
+    btn.onclick = () => {
+      currentSortMode = btn.dataset.sort;
+      document
+        .querySelectorAll(".sort-option")
+        .forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById("sort-sheet").classList.add("hidden");
+      renderFileList(document.getElementById("search-input").value);
+    };
+  });
+
+  // Sync
   document.getElementById("sync-btn").onclick = handleSync;
 
-  // ACTION SHEET CLOSE
+  // Action Sheet & Rename
   document.getElementById("sheet-close").onclick = () =>
     document.getElementById("action-sheet").classList.add("hidden");
   document.getElementById("cancel-rename").onclick = () =>
     document.getElementById("rename-modal").classList.add("hidden");
 });
 
-// --- CORE LOGIC ---
 function initializeApp() {
   if (typeof firebase !== "undefined" && !firebase.apps.length)
     firebase.initializeApp(CONFIG.FIREBASE);
   loadFilesFromFirebase();
+}
+
+function resetUploadForm() {
+  currentUploadTags = [];
+  renderUploadTags();
+  document.getElementById("file-input").value = "";
+  document.getElementById("file-name-display").innerText = "Chọn file...";
+  document.getElementById("upload-rename-box").classList.add("hidden");
+  document.getElementById("upload-filename-input").value = "";
+  document.getElementById("upload-status").innerText = "";
+}
+
+// --- TAG INPUT LOGIC ---
+function addTag() {
+  const input = document.getElementById("new-tag-input");
+  let val = input.value.trim();
+  if (val) {
+    val = val.charAt(0).toUpperCase() + val.slice(1);
+    if (!currentUploadTags.includes(val)) currentUploadTags.push(val);
+    renderUploadTags();
+    input.value = "";
+  }
 }
 
 function renderUploadTags() {
@@ -126,7 +161,7 @@ function renderUploadTags() {
   div.innerHTML = currentUploadTags
     .map(
       (t, i) =>
-        `<span class="tag-badge" onclick="removeUploadTag(${i})">${t} &times;</span>`
+        `<span class="upload-tag-chip" onclick="removeUploadTag(${i})">${t} &times;</span>`
     )
     .join("");
 }
@@ -135,10 +170,11 @@ window.removeUploadTag = (i) => {
   renderUploadTags();
 };
 
-// --- LOAD FILES ---
+// --- LOAD & RENDER ---
 function loadFilesFromFirebase() {
   const db = firebase.database();
   const list = document.getElementById("file-list");
+  list.innerHTML = '<li class="loading-msg">Đang tải dữ liệu...</li>';
 
   db.ref("files")
     .once("value")
@@ -147,11 +183,16 @@ function loadFilesFromFirebase() {
       ALL_FILES_DATA = [];
       if (data) {
         Object.entries(data).forEach(([key, file]) => {
-          ALL_FILES_DATA.push({ key: key, ...file, tag: file.tag || "Khác" });
+          ALL_FILES_DATA.push({
+            key: key,
+            ...file,
+            tag: file.tag || "Khác",
+            isPinned: file.isPinned || false,
+          });
         });
-        ALL_FILES_DATA.reverse();
       }
-      updateFilters();
+      ALL_FILES_DATA.reverse(); // Default loaded
+      updateFilterChips();
       renderFileList();
     });
 }
@@ -170,12 +211,32 @@ function renderFileList(search = "") {
     return matchTag && matchType && matchSearch;
   });
 
+  // Sort Logic
+  filtered.sort((a, b) => {
+    if (a.isPinned && !b.isPinned) return -1;
+    if (!a.isPinned && b.isPinned) return 1;
+
+    switch (currentSortMode) {
+      case "name-asc":
+        return a.fileName.localeCompare(b.fileName);
+      case "name-desc":
+        return b.fileName.localeCompare(a.fileName);
+      case "type":
+        return getFileType(a.fileName).name.localeCompare(
+          getFileType(b.fileName).name
+        );
+      case "newest":
+      default:
+        return 0; // Đã reverse lúc load
+    }
+  });
+
   count.innerText = filtered.length;
   list.innerHTML = "";
 
   if (filtered.length === 0) {
     list.innerHTML =
-      '<div style="text-align:center; padding:20px; color:#999">Không có file nào</div>';
+      '<div style="text-align:center; padding:40px; color:#9ca3af">Không tìm thấy file nào</div>';
     return;
   }
 
@@ -185,14 +246,18 @@ function renderFileList(search = "") {
       .split(",")
       .map((t) => `<span class="tag-badge">${t.trim()}</span>`)
       .join("");
+    const pinnedClass = file.isPinned ? "show" : "";
 
     const li = document.createElement("li");
     li.className = "file-item";
     li.innerHTML = `
             <i class="fa-solid ${typeInfo.icon} file-icon" style="color:${typeInfo.color}"></i>
-            <div class="file-info">
-                <a href="${file.viewLink}" target="_blank" class="file-name">${file.fileName}</a>
-                <div class="file-tags">${tagsHTML}</div>
+            <div class="file-info" onclick="window.open('${file.viewLink}', '_blank')">
+                <div class="file-name">${file.fileName}</div>
+                <div class="file-meta">
+                    <i class="fa-solid fa-star pinned-icon ${pinnedClass}"></i>
+                    <div class="file-tags">${tagsHTML}</div>
+                </div>
             </div>
             <div class="menu-dots" onclick="openActionSheet('${file.key}')"><i class="fa-solid fa-ellipsis-vertical"></i></div>
         `;
@@ -208,17 +273,35 @@ window.openActionSheet = (key) => {
 
   document.getElementById("sheet-filename").innerText = file.fileName;
   document.getElementById("sheet-download").href = file.downloadLink;
+
+  // Pin Toggle UI
+  const pinBtnText = document.getElementById("sheet-pin-text");
+  const pinBtnIcon = document.getElementById("sheet-pin-icon");
+  if (file.isPinned) {
+    pinBtnText.innerText = "Bỏ ghim";
+    pinBtnIcon.className = "fa-solid fa-star";
+    pinBtnIcon.style.color = "var(--gold-star)";
+  } else {
+    pinBtnText.innerText = "Ghim file";
+    pinBtnIcon.className = "fa-regular fa-star";
+    pinBtnIcon.style.color = "var(--text-light)";
+  }
+
   document.getElementById("action-sheet").classList.remove("hidden");
 
-  // Setup Delete
+  // Handle Buttons
+  document.getElementById("sheet-pin").onclick = () => {
+    togglePin(file.key, file.isPinned);
+    document.getElementById("action-sheet").classList.add("hidden");
+  };
+
   document.getElementById("sheet-delete").onclick = () => {
-    if (confirm(`Xóa "${file.fileName}"?`)) {
+    if (confirm(`Xóa vĩnh viễn "${file.fileName}"?`)) {
       handleDelete(file.key, file.fileId);
       document.getElementById("action-sheet").classList.add("hidden");
     }
   };
 
-  // Setup Rename
   document.getElementById("sheet-rename").onclick = () => {
     document.getElementById("action-sheet").classList.add("hidden");
     document.getElementById("rename-modal").classList.remove("hidden");
@@ -228,10 +311,19 @@ window.openActionSheet = (key) => {
   };
 };
 
-// --- UPLOAD ---
+// --- ASYNC ACTIONS ---
+async function togglePin(key, currentStatus) {
+  const newStatus = !currentStatus;
+  await firebase.database().ref(`files/${key}`).update({ isPinned: newStatus });
+  const file = ALL_FILES_DATA.find((f) => f.key === key);
+  if (file) file.isPinned = newStatus;
+  renderFileList(document.getElementById("search-input").value);
+}
+
 async function handleUpload() {
   const fileInput = document.getElementById("file-input");
   const file = fileInput.files[0];
+  const nameInput = document.getElementById("upload-filename-input");
   if (!file) return alert("Chưa chọn file!");
 
   const status = document.getElementById("upload-status");
@@ -239,13 +331,14 @@ async function handleUpload() {
 
   const tags =
     currentUploadTags.length > 0 ? currentUploadTags.join(", ") : "Khác";
+  const finalName = nameInput.value.trim() || file.name;
 
   try {
     const tokenRes = await fetch(CONFIG.GET_TOKEN_URL);
     const { accessToken } = await tokenRes.json();
 
     const metadata = {
-      name: file.name,
+      name: finalName,
       mimeType: file.type,
       parents: [CONFIG.FOLDER_ID],
     };
@@ -272,13 +365,14 @@ async function handleUpload() {
       viewLink: driveFile.webViewLink,
       downloadLink: driveFile.webContentLink,
       tag: tags,
+      isPinned: false,
     };
     await fetch(CONFIG.SAVE_DB_URL, {
       method: "POST",
       body: JSON.stringify(payload),
     });
 
-    // Patch tag
+    // Patch Tag
     const db = firebase.database();
     const snap = await db
       .ref("files")
@@ -293,7 +387,6 @@ async function handleUpload() {
     status.innerText = "Thành công!";
     setTimeout(() => {
       document.getElementById("upload-modal").classList.add("hidden");
-      status.innerText = "";
       loadFilesFromFirebase();
     }, 1000);
   } catch (e) {
@@ -302,14 +395,12 @@ async function handleUpload() {
   }
 }
 
-// --- RENAME ---
 async function handleRename(file) {
   const newName = document.getElementById("rename-input").value.trim();
   if (!newName || newName === file.fileName) {
     document.getElementById("rename-modal").classList.add("hidden");
     return;
   }
-
   try {
     const tokenRes = await fetch(CONFIG.GET_TOKEN_URL);
     const { accessToken } = await tokenRes.json();
@@ -333,7 +424,6 @@ async function handleRename(file) {
   }
 }
 
-// --- DELETE ---
 async function handleDelete(key, fileId) {
   try {
     await fetch(CONFIG.DELETE_FILE_URL, {
@@ -350,95 +440,121 @@ async function handleDelete(key, fileId) {
   }
 }
 
-// --- SYNC ---
 async function handleSync() {
   const btn = document.getElementById("sync-btn");
-  btn.classList.add("fa-spin");
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
   try {
-    // Backup logic omitted for brevity, similar to desktop
+    // Logic sync tương tự desktop
+    const snapshot = await firebase.database().ref("files").once("value");
+    const currentData = snapshot.val() || {};
+    const metaMap = {};
+    Object.values(currentData).forEach((f) => {
+      if (f.fileId)
+        metaMap[f.fileId] = { tag: f.tag, isPinned: f.isPinned || false };
+    });
+
     await fetch(CONFIG.SYNC_URL, {
       method: "POST",
       body: JSON.stringify({ folderId: CONFIG.FOLDER_ID }),
     });
+
+    // Restore meta logic
+    const newSnap = await firebase.database().ref("files").once("value");
+    const newData = newSnap.val() || {};
+    const updates = {};
+    Object.keys(newData).forEach((key) => {
+      const f = newData[key];
+      const old = metaMap[f.fileId];
+      if (old) {
+        let u = {};
+        if ((!f.tag || f.tag === "Khác") && old.tag)
+          u[`files/${key}/tag`] = old.tag;
+        if (old.isPinned) u[`files/${key}/isPinned`] = true;
+        Object.assign(updates, u);
+      }
+    });
+    if (Object.keys(updates).length > 0)
+      await firebase.database().ref().update(updates);
+
     loadFilesFromFirebase();
   } catch (e) {
-    alert("Lỗi: " + e.message);
+    alert("Lỗi Sync: " + e.message);
   } finally {
-    btn.classList.remove("fa-spin");
+    btn.innerHTML = '<i class="fa-solid fa-rotate"></i>';
   }
 }
 
 // --- HELPERS ---
 function getFileType(name) {
-  if (name.match(/\.(jpg|jpeg|png|gif)$/i))
+  if (name.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i))
     return { name: "Hình ảnh", icon: "fa-file-image", color: "#e67e22" };
   if (name.match(/\.(pdf)$/i))
     return { name: "PDF", icon: "fa-file-pdf", color: "#8e44ad" };
   if (name.match(/\.(doc|docx)$/i))
     return { name: "Word", icon: "fa-file-word", color: "#2b579a" };
-  return { name: "Khác", icon: "fa-file", color: "#95a5a6" };
+  if (name.match(/\.(xls|xlsx|csv)$/i))
+    return { name: "Excel", icon: "fa-file-excel", color: "#217346" };
+  if (name.match(/\.(ppt|pptx)$/i))
+    return { name: "PowerPoint", icon: "fa-file-powerpoint", color: "#d24726" };
+  if (name.match(/\.(zip|rar|7z)$/i))
+    return { name: "Nén", icon: "fa-file-zipper", color: "#f1c40f" };
+  return { name: "Khác", icon: "fa-file", color: "#9ca3af" };
 }
 
-function updateFilters() {
+function updateFilterChips() {
   const tagContainer = document.getElementById("tag-filters");
   const typeContainer = document.getElementById("type-filters");
 
-  // Extract Unique Tags
+  // Tags
   const tags = new Set();
   ALL_FILES_DATA.forEach((f) =>
     f.tag.split(",").forEach((t) => tags.add(t.trim()))
   );
 
-  tagContainer.innerHTML =
-    `<div class="filter-chip active" onclick="toggleFilter(this, 'tag', 'ALL')">Tất cả</div>` +
-    Array.from(tags)
-      .map(
-        (t) =>
-          `<div class="filter-chip" onclick="toggleFilter(this, 'tag', '${t}')">${t}</div>`
-      )
-      .join("");
+  let tagHTML = `<div class="filter-chip ${
+    ACTIVE_TAGS.has("ALL") ? "active" : ""
+  }" onclick="toggleFilter('tag', 'ALL')">Tất cả</div>`;
+  Array.from(tags)
+    .sort()
+    .forEach((t) => {
+      tagHTML += `<div class="filter-chip ${
+        ACTIVE_TAGS.has(t) ? "active" : ""
+      }" onclick="toggleFilter('tag', '${t}')">${t}</div>`;
+    });
+  tagContainer.innerHTML = tagHTML;
 
-  // Extract Unique Types
+  // Types
   const types = new Set(
     ALL_FILES_DATA.map((f) => getFileType(f.fileName).name)
   );
-  typeContainer.innerHTML =
-    `<div class="filter-chip active" onclick="toggleFilter(this, 'type', 'ALL')">Tất cả</div>` +
-    Array.from(types)
-      .map(
-        (t) =>
-          `<div class="filter-chip" onclick="toggleFilter(this, 'type', '${t}')">${t}</div>`
-      )
-      .join("");
+  let typeHTML = `<div class="filter-chip ${
+    ACTIVE_TYPES.has("ALL") ? "active" : ""
+  }" onclick="toggleFilter('type', 'ALL')">Tất cả</div>`;
+  Array.from(types)
+    .sort()
+    .forEach((t) => {
+      typeHTML += `<div class="filter-chip ${
+        ACTIVE_TYPES.has(t) ? "active" : ""
+      }" onclick="toggleFilter('type', '${t}')">${t}</div>`;
+    });
+  typeContainer.innerHTML = typeHTML;
 }
 
-window.toggleFilter = (el, type, val) => {
-  const set = type === "tag" ? ACTIVE_TAGS : ACTIVE_TYPES;
-  const container =
-    type === "tag"
-      ? document.getElementById("tag-filters")
-      : document.getElementById("type-filters");
-  const allChip = container.firstElementChild;
+function updateFiltersUI() {
+  updateFilterChips();
+}
 
+window.toggleFilter = (type, val) => {
+  const set = type === "tag" ? ACTIVE_TAGS : ACTIVE_TYPES;
   if (val === "ALL") {
     set.clear();
     set.add("ALL");
-    Array.from(container.children).forEach((c) => c.classList.remove("active"));
-    el.classList.add("active");
   } else {
-    allChip.classList.remove("active");
-    set.delete("ALL");
-    if (set.has(val)) {
-      set.delete(val);
-      el.classList.remove("active");
-    } else {
-      set.add(val);
-      el.classList.add("active");
-    }
-    if (set.size === 0) {
-      set.add("ALL");
-      allChip.classList.add("active");
-    }
+    if (set.has("ALL")) set.delete("ALL");
+    if (set.has(val)) set.delete(val);
+    else set.add(val);
+    if (set.size === 0) set.add("ALL");
   }
+  updateFiltersUI();
   renderFileList(document.getElementById("search-input").value);
 };

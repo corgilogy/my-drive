@@ -42,6 +42,9 @@
           <i class="fa-solid fa-magnifying-glass"></i>
           <input type="text" id="search-input" placeholder="Tìm kiếm..." />
         </div>
+        <button id="sort-btn">
+          <i class="fa-solid fa-arrow-down-short-wide"></i>
+        </button>
         <button id="sync-btn"><i class="fa-solid fa-rotate"></i></button>
       </header>
 
@@ -65,6 +68,9 @@
               <!-- JS render types -->
             </div>
           </div>
+        </div>
+        <div class="drawer-footer">
+          <button id="reset-filter-btn">Đặt lại bộ lọc</button>
         </div>
       </aside>
 
@@ -94,9 +100,26 @@
             </label>
           </div>
 
+          <div
+            id="upload-rename-box"
+            class="hidden"
+            style="margin-bottom: 15px"
+          >
+            <input
+              type="text"
+              id="upload-filename-input"
+              class="full-input"
+              placeholder="Tên hiển thị (Tùy chọn)"
+            />
+          </div>
+
           <div class="tag-input-area">
             <div class="input-row">
-              <input type="text" id="new-tag-input" placeholder="Nhập tag..." />
+              <input
+                type="text"
+                id="new-tag-input"
+                placeholder="Thêm tag (VD: Tài liệu)..."
+              />
               <button id="add-tag-btn"><i class="fa-solid fa-plus"></i></button>
             </div>
             <div id="upload-tags-list" class="tags-list"></div>
@@ -110,11 +133,35 @@
         </div>
       </div>
 
+      <!-- Sort Sheet -->
+      <div id="sort-sheet" class="modal hidden">
+        <div class="sheet-content">
+          <h3>Sắp xếp theo</h3>
+          <button class="sheet-btn sort-option" data-sort="newest">
+            <i class="fa-regular fa-clock"></i> Mới nhất
+          </button>
+          <button class="sheet-btn sort-option" data-sort="name-asc">
+            <i class="fa-solid fa-arrow-down-a-z"></i> Tên (A-Z)
+          </button>
+          <button class="sheet-btn sort-option" data-sort="name-desc">
+            <i class="fa-solid fa-arrow-up-a-z"></i> Tên (Z-A)
+          </button>
+          <button class="sheet-btn sort-option" data-sort="type">
+            <i class="fa-regular fa-file"></i> Loại file
+          </button>
+          <button class="sheet-btn cancel" id="close-sort">Đóng</button>
+        </div>
+      </div>
+
       <!-- Action Sheet (Menu 3 chấm) -->
       <div id="action-sheet" class="modal hidden">
         <div class="sheet-content">
           <h3 id="sheet-filename">Tên file</h3>
           <div class="sheet-options">
+            <button class="sheet-btn" id="sheet-pin">
+              <i class="fa-regular fa-star" id="sheet-pin-icon"></i>
+              <span id="sheet-pin-text">Ghim file</span>
+            </button>
             <button class="sheet-btn rename" id="sheet-rename">
               <i class="fa-solid fa-pen"></i> Đổi tên
             </button>
