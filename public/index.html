@@ -4,12 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Corgi Drive</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap"
+      rel="stylesheet"
+    />
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
     />
     <link rel="stylesheet" href="style.css" />
     <script type="text/javascript">
+      // Chuyển hướng mobile nếu phát hiện thiết bị di động
       if (
         /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
           navigator.userAgent
@@ -20,39 +27,53 @@
     </script>
   </head>
   <body>
-    <!-- LOGIN SCREEN -->
+    <!-- LOGIN SCREEN (DESKTOP GLASSMORPHISM) -->
     <div id="login-overlay">
-      <div class="login-box">
+      <div class="glass-card">
         <div class="login-header">
-          <img src="log.png" alt="Logo" class="login-logo-img" />
+          <!-- Đã đổi thành login.gif -->
+          <img src="login.gif" alt="Logo" class="login-logo-img" />
           <h1 class="login-title">Corgi Drive</h1>
         </div>
-        <div class="input-group">
-          <input
-            type="password"
-            id="password-input"
-            placeholder="Nhập mật khẩu truy cập..."
-          />
+
+        <div class="login-body">
+          <div class="input-group-modern">
+            <i class="fa-solid fa-lock"></i>
+            <input
+              type="password"
+              id="password-input"
+              placeholder="Nhập mật khẩu"
+              autocomplete="off"
+            />
+          </div>
+
           <button id="login-btn">
-            <i class="fa-solid fa-arrow-right"></i>
+            <span class="btn-text"
+              >Đăng nhập <i class="fa-solid fa-arrow-right"></i
+            ></span>
+            <div class="spinner hidden"></div>
           </button>
         </div>
-        <p id="error-message" class="error-msg">
-          <i class="fa-solid fa-circle-exclamation"></i> Sai mật khẩu
+
+        <p id="error-message" class="error-msg hidden">
+          <i class="fa-solid fa-circle-exclamation"></i> Mật khẩu không đúng
         </p>
       </div>
     </div>
 
-    <!-- DASHBOARD -->
-    <div id="main-app">
-      <!-- SIDEBAR -->
+    <!-- DASHBOARD (LAYOUT CHÍNH: SIDEBAR TRÁI - CONTENT PHẢI) -->
+    <div id="main-app" class="hidden">
+      <!-- 1. SIDEBAR (TRÁI) -->
       <aside class="sidebar">
         <div class="brand">
-          <i class="fa-brands fa-google-drive"></i> <span>Corgi Drive</span>
+          <!-- Thay icon cũ bằng ảnh GIF -->
+          <img src="cloud.gif" alt="Logo" class="sidebar-logo-img" />
+          <span>Corgi Drive</span>
         </div>
 
         <button id="btn-open-modal" class="btn-new-file">
-          <i class="fa-solid fa-cloud-arrow-up"></i> Thêm file
+          <img src="up.gif" alt="Upload" class="sidebar-upload-gif" />
+          Thêm file
         </button>
 
         <div class="sidebar-menu">
@@ -67,20 +88,27 @@
         </div>
 
         <div class="sidebar-footer">
-          <div class="datetime-display">
+          <!-- Link Google Drive -->
+          <a
+            href="https://drive.google.com/drive/folders/1i__DIWWEX7HYemtyZ5wqwaYcYfnW50a3?usp=drive_link"
+            target="_blank"
+            class="datetime-display"
+            title="Mở Google Drive gốc"
+          >
             <div id="current-date">--/--/----</div>
             <div id="current-time">--:--:--</div>
-          </div>
+          </a>
+
           <button id="sync_btn" class="btn-sidebar">
             <i class="fa-solid fa-rotate"></i> Đồng bộ & Làm mới
           </button>
         </div>
       </aside>
 
-      <!-- CONTENT -->
+      <!-- 2. CONTENT AREA (PHẢI) -->
       <main class="content-area">
         <div class="files-wrapper">
-          <!-- PHẦN 1: HEADER CỐ ĐỊNH (TÌM KIẾM + SORT) -->
+          <!-- Header công cụ (Search + Sort) -->
           <div class="files-top-bar">
             <div class="header-tools">
               <div class="search-box">
@@ -104,14 +132,13 @@
             </div>
           </div>
 
-          <!-- PHẦN 2: KHUNG CHỨA BẢNG (CUỘN ĐƯỢC) -->
+          <!-- Bảng dữ liệu (Scrollable) -->
           <div class="table-scroll-container">
             <table class="file-table">
               <thead>
                 <tr>
-                  <!-- Tiêu đề bảng được cố định bằng CSS sticky -->
-                  <th style="width: 70%">Tên File</th>
-                  <th style="width: 5%; text-align: center">
+                  <th style="width: 65%">Tên File</th>
+                  <th style="width: 10%; text-align: center">
                     <i class="fa-solid fa-star"></i>
                   </th>
                   <th style="width: 25%">Tags</th>

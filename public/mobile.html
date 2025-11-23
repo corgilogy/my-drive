@@ -14,19 +14,32 @@
     <link rel="stylesheet" href="mobile.css" />
   </head>
   <body>
-    <!-- LOGIN SCREEN -->
+    <!-- LOGIN SCREEN (GLASSMORPHISM) -->
     <div id="login-screen">
-      <div class="login-content">
-        <img src="log.png" class="login-logo" alt="Logo" />
-        <h1>Corgi Drive</h1>
-        <div class="login-input-group">
-          <input
-            type="password"
-            id="pass-input"
-            placeholder="Nhập mật khẩu..."
-          />
+      <div class="glass-container">
+        <div class="logo-area">
+          <!-- Đã đổi thành login.gif -->
+          <img src="login.gif" class="login-logo" alt="Logo" />
+        </div>
+        <h1 class="app-title">Corgi Drive</h1>
+        <p class="app-subtitle">Lưu trữ dữ liệu an toàn</p>
+
+        <div class="login-form-group">
+          <div class="input-wrapper">
+            <i class="fa-solid fa-lock input-icon"></i>
+            <input
+              type="password"
+              id="pass-input"
+              placeholder="Nhập mật khẩu..."
+              autocomplete="off"
+            />
+          </div>
+
           <button id="btn-login">
-            <i class="fa-solid fa-arrow-right"></i>
+            <span class="btn-text"
+              ><i class="fa-solid fa-arrow-right"></i
+            ></span>
+            <div class="spinner hidden"></div>
           </button>
         </div>
         <p id="login-error" class="hidden">Sai mật khẩu!</p>
@@ -48,25 +61,22 @@
         <button id="sync-btn"><i class="fa-solid fa-rotate"></i></button>
       </header>
 
-      <!-- Filter Drawer (Sidebar ẩn) -->
+      <!-- Filter Drawer -->
       <div id="drawer-overlay" class="hidden"></div>
       <aside id="app-drawer">
         <div class="drawer-header">
+          <!-- Logo trong Sidebar giữ nguyên là log.png (hoặc bạn có thể đổi nếu muốn) -->
           <img src="log.png" alt="Logo" />
           <span>Bộ lọc</span>
         </div>
         <div class="drawer-content">
           <div class="filter-section">
             <h3>Tags</h3>
-            <div id="tag-filters" class="chip-container">
-              <!-- JS render tags -->
-            </div>
+            <div id="tag-filters" class="chip-container"></div>
           </div>
           <div class="filter-section">
             <h3>Loại file</h3>
-            <div id="type-filters" class="chip-container">
-              <!-- JS render types -->
-            </div>
+            <div id="type-filters" class="chip-container"></div>
           </div>
         </div>
         <div class="drawer-footer">
@@ -80,7 +90,6 @@
           <span>Tổng: <b id="file-count">0</b> file</span>
         </div>
         <ul id="file-list">
-          <!-- JS render files -->
           <li class="loading-msg">Đang tải dữ liệu...</li>
         </ul>
       </div>
@@ -153,7 +162,7 @@
         </div>
       </div>
 
-      <!-- Action Sheet (Menu 3 chấm) -->
+      <!-- Action Sheet -->
       <div id="action-sheet" class="modal hidden">
         <div class="sheet-content">
           <h3 id="sheet-filename">Tên file</h3>
@@ -170,8 +179,9 @@
               target="_blank"
               class="sheet-btn download"
               id="sheet-download"
-              ><i class="fa-solid fa-download"></i> Tải xuống</a
             >
+              <i class="fa-solid fa-download"></i> Tải xuống
+            </a>
             <button class="sheet-btn delete" id="sheet-delete">
               <i class="fa-solid fa-trash"></i> Xóa file
             </button>

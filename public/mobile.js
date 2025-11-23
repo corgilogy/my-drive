@@ -31,9 +31,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const loginScreen = document.getElementById("login-screen");
   const passInput = document.getElementById("pass-input");
   const loginBtn = document.getElementById("btn-login");
+  const loginError = document.getElementById("login-error");
+  const btnText = loginBtn.querySelector(".btn-text");
+  const spinner = loginBtn.querySelector(".spinner");
 
   if (sessionStorage.getItem("myDrive_isLoggedIn") === "true") {
-    showApp();
+    showApp(false); // No delay if already logged in
   }
 
   loginBtn.addEventListener("click", checkLogin);
@@ -43,17 +46,40 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function checkLogin() {
     if (passInput.value === MY_PASSWORD) {
-      sessionStorage.setItem("myDrive_isLoggedIn", "true");
-      showApp();
+      // Show loading state
+      btnText.classList.add("hidden");
+      spinner.classList.remove("hidden");
+      loginBtn.disabled = true;
+      loginError.classList.add("hidden");
+
+      // Simulate network delay for effect
+      setTimeout(() => {
+        sessionStorage.setItem("myDrive_isLoggedIn", "true");
+        showApp(true); // With fade transition
+      }, 1500);
     } else {
-      document.getElementById("login-error").classList.remove("hidden");
+      loginError.classList.remove("hidden");
+      // Shake animation trigger reset
+      loginError.style.animation = "none";
+      loginError.offsetHeight; /* trigger reflow */
+      loginError.style.animation = null;
     }
   }
 
-  function showApp() {
-    loginScreen.classList.add("hidden");
-    document.getElementById("app-screen").classList.remove("hidden");
-    initializeApp();
+  function showApp(withTransition) {
+    if (withTransition) {
+      loginScreen.style.opacity = "0";
+      loginScreen.style.transition = "opacity 0.5s ease";
+      setTimeout(() => {
+        loginScreen.classList.add("hidden");
+        document.getElementById("app-screen").classList.remove("hidden");
+        initializeApp();
+      }, 500);
+    } else {
+      loginScreen.classList.add("hidden");
+      document.getElementById("app-screen").classList.remove("hidden");
+      initializeApp();
+    }
   }
 
   // --- UI INTERACTIONS ---
@@ -119,7 +145,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Sync
-  document.getElementById("sync-btn").onclick = handleSync;
+  document.getElementById("sync-btn").onclick = () => handleSync(false);
 
   // Action Sheet & Rename
   document.getElementById("sheet-close").onclick = () =>
@@ -132,6 +158,11 @@ function initializeApp() {
   if (typeof firebase !== "undefined" && !firebase.apps.length)
     firebase.initializeApp(CONFIG.FIREBASE);
   loadFilesFromFirebase();
+
+  // Auto sync quietly on load
+  setTimeout(() => {
+    handleSync(true);
+  }, 1000);
 }
 
 function resetUploadForm() {
@@ -174,7 +205,9 @@ window.removeUploadTag = (i) => {
 function loadFilesFromFirebase() {
   const db = firebase.database();
   const list = document.getElementById("file-list");
-  list.innerHTML = '<li class="loading-msg">Đang tải dữ liệu...</li>';
+  if (!list.querySelector(".file-item")) {
+    list.innerHTML = '<li class="loading-msg">Đang tải dữ liệu...</li>';
+  }
 
   db.ref("files")
     .once("value")
@@ -193,7 +226,7 @@ function loadFilesFromFirebase() {
       }
       ALL_FILES_DATA.reverse(); // Default loaded
       updateFilterChips();
-      renderFileList();
+      renderFileList(document.getElementById("search-input").value);
     });
 }
 
@@ -440,47 +473,74 @@ async function handleDelete(key, fileId) {
   }
 }
 
-async function handleSync() {
+async function handleSync(silent = false) {
   const btn = document.getElementById("sync-btn");
-  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+  const originalHTML = btn.innerHTML;
+
+  if (silent !== true) {
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    btn.disabled = true;
+  }
+
   try {
-    // Logic sync tương tự desktop
+    // 1. Get Access Token
+    const tokenRes = await fetch(CONFIG.GET_TOKEN_URL);
+    const { accessToken } = await tokenRes.json();
+
+    // 2. Fetch Drive Files
+    const q = `'${CONFIG.FOLDER_ID}' in parents and trashed = false`;
+    const driveRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+        q
+      )}&fields=files(id,name,webViewLink,webContentLink,mimeType)&pageSize=1000`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const driveData = await driveRes.json();
+    const driveFiles = driveData.files || [];
+
+    // 3. Fetch Firebase
     const snapshot = await firebase.database().ref("files").once("value");
     const currentData = snapshot.val() || {};
+
     const metaMap = {};
-    Object.values(currentData).forEach((f) => {
+    Object.entries(currentData).forEach(([key, f]) => {
       if (f.fileId)
-        metaMap[f.fileId] = { tag: f.tag, isPinned: f.isPinned || false };
+        metaMap[f.fileId] = {
+          key: key,
+          tag: f.tag,
+          isPinned: f.isPinned || false,
+        };
     });
 
-    await fetch(CONFIG.SYNC_URL, {
-      method: "POST",
-      body: JSON.stringify({ folderId: CONFIG.FOLDER_ID }),
+    const newDbData = {};
+    driveFiles.forEach((file) => {
+      const meta = metaMap[file.id];
+      const rowKey = meta
+        ? meta.key
+        : firebase.database().ref("files").push().key;
+
+      newDbData[rowKey] = {
+        fileId: file.id,
+        fileName: file.name,
+        viewLink: file.webViewLink,
+        downloadLink: file.webContentLink || file.webViewLink,
+        tag: meta ? meta.tag : "Khác",
+        isPinned: meta ? meta.isPinned : false,
+      };
     });
 
-    // Restore meta logic
-    const newSnap = await firebase.database().ref("files").once("value");
-    const newData = newSnap.val() || {};
-    const updates = {};
-    Object.keys(newData).forEach((key) => {
-      const f = newData[key];
-      const old = metaMap[f.fileId];
-      if (old) {
-        let u = {};
-        if ((!f.tag || f.tag === "Khác") && old.tag)
-          u[`files/${key}/tag`] = old.tag;
-        if (old.isPinned) u[`files/${key}/isPinned`] = true;
-        Object.assign(updates, u);
-      }
-    });
-    if (Object.keys(updates).length > 0)
-      await firebase.database().ref().update(updates);
+    // 4. Update Firebase
+    await firebase.database().ref("files").set(newDbData);
 
     loadFilesFromFirebase();
   } catch (e) {
-    alert("Lỗi Sync: " + e.message);
+    console.error(e);
+    if (silent !== true) alert("Lỗi Sync: " + e.message);
   } finally {
-    btn.innerHTML = '<i class="fa-solid fa-rotate"></i>';
+    if (silent !== true) {
+      btn.innerHTML = originalHTML;
+      btn.disabled = false;
+    }
   }
 }
 

@@ -31,121 +31,277 @@ input::-webkit-calendar-picker-indicator {
   display: none !important;
 }
 
-/* LOGIN */
+/* --- LOGIN SCREEN (DESKTOP GLASSMORPHISM) --- */
 #login-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+
+  /* Dải màu cầu vồng: Đỏ, Cam, Vàng, Lục, Lam, Chàm, Tím */
+  background: linear-gradient(
+    -15deg,
+    #4d016b,
+    /* Đỏ */ #1e089a,
+    /* Cam */ #70003c,
+    /* Vàng */ #7003a2,
+    /* Lục */ #08419c,
+    /* Lam */ #072895,
+    /* Chàm */ #0a03c3 /* Tím */
+  );
+
+  /* Tăng kích thước nền để hiệu ứng chuyển động mượt mà */
+  background-size: 400% 400%;
+
+  /* Thời gian chạy 1 vòng màu là 15s */
+  animation: rainbowEffect 15s ease infinite;
+
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 9999;
 }
-.login-box {
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(12px);
+
+/* Keyframes tạo chuyển động cầu vồng */
+@keyframes rainbowEffect {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   padding: 3rem;
   border-radius: 24px;
-  width: 400px;
+  width: 420px;
   text-align: center;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
   transform: translateY(-20px);
+  animation: floatUp 0.6s ease-out;
 }
+@keyframes floatUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(-20px);
+    opacity: 1;
+  }
+}
+
 .login-header {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 15px;
+  margin-bottom: 2rem;
 }
+
+/* LOGO MÀN HÌNH ĐĂNG NHẬP */
 .login-logo-img {
-  width: 200px;
-  height: 200px;
-  object-fit: cover;
-  border-radius: 50%;
-  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.15);
-  border: 4px solid white;
+  width: 140px;
+  height: auto;
+  object-fit: contain;
+
+  /* Bo góc mềm mại (Squircle modern style) */
+  border-radius: 24px;
+
+  /* Viền kính hiện đại: Mỏng, bán trong suốt */
+  border: 2px solid rgba(255, 255, 255, 0.6);
+
+  /* Nền trắng mờ phía sau logo */
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(5px);
+
+  /* Tạo khoảng cách giữa hình và viền */
+  padding: 8px;
+
+  /* Hiệu ứng bóng đổ kép */
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15),
+    /* Shadow tạo độ nổi */ 0 0 15px rgba(255, 255, 255, 0.3); /* Glow nhẹ xung quanh */
+
+  /* Hiệu ứng chuyển động mượt mà */
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
+
+/* Hiệu ứng khi di chuột vào logo */
+.login-logo-img:hover {
+  transform: translateY(-5px) scale(1.02); /* Bay lên nhẹ */
+  border-color: #ffffff; /* Viền sáng lên */
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2), 0 0 25px rgba(255, 255, 255, 0.5); /* Glow mạnh hơn */
+}
+
+/* TIÊU ĐỀ MÀN HÌNH ĐĂNG NHẬP */
 .login-title {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--primary-color);
+  font-family: "Pacifico", cursive;
+  font-weight: 400;
+  font-size: 2.8rem;
+  color: white;
   letter-spacing: 1px;
   margin: 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
-.input-group {
+
+.login-body {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 15px;
+}
+
+/* INPUT PASSWORD */
+.input-group-modern {
+  position: relative;
   width: 100%;
-  background: white;
-  padding: 5px;
+}
+.input-group-modern i {
+  position: absolute;
+  left: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #000000; /* Icon khóa màu đen */
+  z-index: 10;
+}
+.input-group-modern input {
+  width: 100%;
+  padding: 14px 14px 14px 45px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
   border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
-  border: 1px solid transparent;
-  transition: 0.3s;
-}
-.input-group:focus-within {
-  border-color: var(--primary-color);
-  box-shadow: 0 4px 15px rgba(79, 70, 229, 0.1);
-}
-.input-group input {
-  flex: 1;
-  padding: 12px 15px;
-  border: none;
-  border-radius: 8px;
   outline: none;
   font-size: 1rem;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  transition: all 0.3s ease;
 }
-.input-group button {
+.input-group-modern input:focus {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: white;
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+}
+.input-group-modern input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+#login-btn {
   background: var(--primary-color);
   color: white;
   border: none;
-  width: 45px;
-  border-radius: 8px;
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
   cursor: pointer;
   font-size: 1.1rem;
-  transition: 0.2s;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3);
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
-.input-group button:hover {
+#login-btn:hover {
   background: #4338ca;
-  transform: scale(1.05);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
 }
-.error-msg {
-  color: var(--danger);
-  display: none;
-  margin-top: 0;
-  font-size: 0.9rem;
-  font-weight: 500;
+#login-btn:active {
+  transform: scale(0.98);
 }
 
-/* SIDEBAR */
+.error-msg {
+  color: #ffe4e6;
+  background: rgba(220, 38, 38, 0.6);
+  padding: 10px;
+  border-radius: 8px;
+  margin-top: 15px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  animation: shake 0.3s;
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+/* --- MAIN LAYOUT CONTAINER --- */
+#main-app {
+  display: flex; /* Sidebar trái, Content phải */
+  flex-direction: row;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* --- SIDEBAR (LEFT) --- */
 .sidebar {
-  width: 260px;
+  width: 280px;
+  height: 100%;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   padding: 1.5rem;
   flex-shrink: 0;
-  height: 100%;
+  z-index: 20;
 }
+
+/* BRAND HEADER TRONG SIDEBAR */
 .brand {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: var(--primary-color);
-  margin-bottom: 2rem;
   display: flex;
-  gap: 10px;
-  align-items: center;
+  align-items: center; /* Căn giữa theo chiều dọc */
+  justify-content: center; /* Căn giữa theo chiều ngang */
+  gap: 12px; /* Khoảng cách giữa Logo và Chữ */
+  flex-wrap: nowrap; /* Bắt buộc 1 dòng */
+  margin-bottom: 2rem;
+
+  font-family: "Pacifico", cursive;
+  font-weight: 400;
+  font-size: 1.8rem; /* Kích thước chữ (tăng lên để cân với logo) */
+  color: var(--primary-color);
+
+  white-space: nowrap; /* Không xuống dòng */
+  overflow: hidden;
 }
+
+/* LOGO CLOUD.GIF TRONG SIDEBAR */
+.sidebar-logo-img {
+  width: 50px; /* Kích thước logo (cân đối với font 1.8rem) */
+  height: 50px;
+  object-fit: contain;
+  flex-shrink: 0; /* Không bị bóp méo */
+}
+
 .btn-new-file {
   width: 100%;
   padding: 14px;
@@ -164,11 +320,17 @@ input::-webkit-calendar-picker-indicator {
   box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3);
   transition: all 0.2s;
 }
+.sidebar-upload-gif {
+  width: 40px; /* Kích thước ảnh gif */
+  height: 40px;
+  object-fit: contain; /* Đảm bảo ảnh không bị méo */
+}
 .btn-new-file:hover {
   background: #4338ca;
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
 }
+
 .sidebar-menu {
   flex: 1;
   overflow-y: auto;
@@ -183,10 +345,21 @@ input::-webkit-calendar-picker-indicator {
   color: var(--text-sub);
   margin-bottom: 0.8rem;
 }
+
 .filter-options {
   display: flex;
   flex-direction: column;
   gap: 5px;
+  max-height: 250px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.filter-options::-webkit-scrollbar {
+  width: 4px;
+}
+.filter-options::-webkit-scrollbar-thumb {
+  background-color: #d1d5db;
+  border-radius: 4px;
 }
 .filter-item {
   display: flex;
@@ -202,11 +375,14 @@ input::-webkit-calendar-picker-indicator {
 .filter-item:hover {
   background: #f3f4f6;
 }
+
 .sidebar-footer {
   margin-top: auto;
   padding-top: 15px;
   border-top: 1px solid var(--border-color);
 }
+
+/* CLOCK STYLE (LINK GOOGLE DRIVE) */
 .datetime-display {
   text-align: center;
   margin-bottom: 15px;
@@ -214,7 +390,18 @@ input::-webkit-calendar-picker-indicator {
   padding: 10px;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
+  display: block;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
+.datetime-display:hover {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
 #current-date {
   font-size: 0.85rem;
   color: var(--text-sub);
@@ -227,6 +414,7 @@ input::-webkit-calendar-picker-indicator {
   font-weight: 700;
   letter-spacing: 1px;
 }
+
 .btn-sidebar {
   width: 100%;
   padding: 12px;
@@ -241,36 +429,35 @@ input::-webkit-calendar-picker-indicator {
   background: #c7d2fe;
 }
 
-/* CONTENT - FIX SCROLL */
+/* --- CONTENT AREA (RIGHT) --- */
 .content-area {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 1.5rem;
+  padding: 20px;
   background: var(--bg-body);
-  height: 100vh; /* Đảm bảo chiều cao full */
+  height: 100vh;
   overflow: hidden;
 }
 
 .files-wrapper {
   flex: 1;
   background: white;
-  border-radius: 12px;
+  border-radius: 16px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
-  height: 100%; /* Chiếm hết chiều cao cha */
-  overflow: hidden; /* Không cho tràn */
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
 }
 
-/* HEADER TOOLS (Search & Sort) */
 .files-top-bar {
   padding: 1rem 1.5rem;
   border-bottom: 1px solid var(--border-color);
   background: white;
-  flex-shrink: 0; /* Không bị co lại */
+  flex-shrink: 0;
 }
-
 .header-tools {
   display: flex;
   gap: 15px;
@@ -329,40 +516,34 @@ input::-webkit-calendar-picker-indicator {
   appearance: none;
 }
 
-/* TABLE SCROLL CONTAINER */
 .table-scroll-container {
-  flex: 1; /* Tự động chiếm hết khoảng trống còn lại */
-  overflow-y: auto; /* Bật thanh cuộn dọc */
+  flex: 1;
+  overflow-y: auto;
   padding: 0 1.5rem 1.5rem 1.5rem;
 }
-
 .file-table {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
 }
-
-/* STICKY THEAD */
 .file-table thead th {
   position: sticky;
   top: 0;
   background: white;
   z-index: 10;
-  padding: 12px 0;
+  padding: 15px 0;
   border-bottom: 2px solid var(--border-color);
   text-align: left;
   color: var(--text-sub);
   font-size: 0.85rem;
   text-transform: uppercase;
-  box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.05); /* Bóng nhẹ để tách biệt */
 }
 .file-table td {
-  padding: 8px 0;
+  padding: 10px 0;
   border-bottom: 1px solid var(--border-color);
   vertical-align: middle;
 }
 
-/* FILE ROWS */
 .file-name-cell {
   display: inline-flex;
   align-items: center;
@@ -401,7 +582,6 @@ input::-webkit-calendar-picker-indicator {
   opacity: 1;
   visibility: visible;
 }
-
 .action-icon-btn {
   color: var(--text-sub);
   cursor: pointer;
@@ -433,7 +613,6 @@ input::-webkit-calendar-picker-indicator {
   color: #dc2626;
   border-color: #fecaca;
 }
-
 .edit-input {
   width: 300px;
   padding: 6px;
@@ -443,8 +622,6 @@ input::-webkit-calendar-picker-indicator {
   outline: none;
   background: #fff;
 }
-
-/* PIN COLUMN */
 .pin-btn {
   cursor: pointer;
   color: #d1d5db;
@@ -462,7 +639,6 @@ input::-webkit-calendar-picker-indicator {
   color: var(--gold-star);
 }
 
-/* TAGS */
 .tags-cell {
   display: flex;
   gap: 5px;

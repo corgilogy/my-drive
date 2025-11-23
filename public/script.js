@@ -32,6 +32,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const loginBtn = document.getElementById("login-btn");
   const errorMsg = document.getElementById("error-message");
 
+  const btnText = loginBtn ? loginBtn.querySelector(".btn-text") : null;
+  const spinner = loginBtn ? loginBtn.querySelector(".spinner") : null;
+
   const modal = document.getElementById("upload-modal-overlay");
   const btnOpenModal = document.getElementById("btn-open-modal");
   const btnCloseModal = document.getElementById("btn-close-modal");
@@ -96,7 +99,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  if (sessionStorage.getItem("myDrive_isLoggedIn") === "true") unlockApp();
+  if (sessionStorage.getItem("myDrive_isLoggedIn") === "true") unlockApp(false);
   else if (passwordInput) passwordInput.focus();
 
   if (loginBtn) loginBtn.addEventListener("click", checkLogin);
@@ -107,25 +110,46 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function checkLogin() {
     if (passwordInput.value === MY_PASSWORD) {
-      sessionStorage.setItem("myDrive_isLoggedIn", "true");
-      unlockApp();
+      if (btnText) btnText.classList.add("hidden");
+      if (spinner) spinner.classList.remove("hidden");
+      loginBtn.disabled = true;
+      errorMsg.classList.add("hidden");
+
+      setTimeout(() => {
+        sessionStorage.setItem("myDrive_isLoggedIn", "true");
+        unlockApp(true);
+      }, 1500);
     } else {
-      errorMsg.style.display = "block";
+      errorMsg.classList.remove("hidden");
+      errorMsg.style.animation = "none";
+      errorMsg.offsetHeight;
+      errorMsg.style.animation = null;
       passwordInput.value = "";
       passwordInput.focus();
     }
   }
 
-  function unlockApp() {
-    if (loginOverlay) loginOverlay.style.display = "none";
-    if (mainApp) mainApp.style.display = "flex";
-    initializeAppLogic();
+  function unlockApp(withTransition) {
+    if (withTransition && loginOverlay) {
+      loginOverlay.style.opacity = "0";
+      loginOverlay.style.transition = "opacity 0.5s ease";
+      setTimeout(() => {
+        loginOverlay.style.display = "none";
+        if (mainApp) mainApp.classList.remove("hidden");
+        initializeAppLogic();
+      }, 500);
+    } else {
+      if (loginOverlay) loginOverlay.style.display = "none";
+      if (mainApp) mainApp.classList.remove("hidden");
+      initializeAppLogic();
+    }
   }
 });
 
 function startClock() {
   const dateEl = document.getElementById("current-date");
   const timeEl = document.getElementById("current-time");
+  if (!dateEl || !timeEl) return;
   function update() {
     const now = new Date();
     const day = String(now.getDate()).padStart(2, "0");
@@ -156,9 +180,15 @@ function resetUploadForm() {
 function initializeAppLogic() {
   if (typeof firebase !== "undefined" && !firebase.apps.length)
     firebase.initializeApp(CONFIG.FIREBASE);
+
   document.getElementById("upload_btn").onclick = handleUpload;
-  document.getElementById("sync_btn").onclick = handleSync;
+  document.getElementById("sync_btn").onclick = () => handleSync(false);
+
   loadFilesFromFirebase();
+
+  setTimeout(() => {
+    handleSync(true);
+  }, 1500);
 }
 
 function addTagToList(inputElement) {
@@ -280,66 +310,110 @@ async function patchTagForFile(fileId, tag) {
   }
 }
 
-async function handleSync() {
+async function handleSync(silent = false) {
   const btnSync = document.getElementById("sync_btn");
   const originalHTML = btnSync.innerHTML;
-  btnSync.innerHTML =
-    '<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...';
-  btnSync.disabled = true;
+
+  if (!silent) {
+    btnSync.innerHTML =
+      '<i class="fa-solid fa-spinner fa-spin"></i> Đang đồng bộ...';
+    btnSync.disabled = true;
+  }
+
   try {
-    const snapshot = await firebase.database().ref("files").once("value");
-    const currentData = snapshot.val() || {};
-    const metaMap = {};
-    Object.values(currentData).forEach((f) => {
-      if (f.fileId) {
-        metaMap[f.fileId] = { tag: f.tag, isPinned: f.isPinned || false };
+    const tokenRes = await fetch(CONFIG.GET_TOKEN_URL);
+    if (!tokenRes.ok) throw new Error("Không lấy được Token");
+    const { accessToken } = await tokenRes.json();
+
+    let allDriveFiles = [];
+    let pageToken = null;
+    const q = `'${CONFIG.FOLDER_ID}' in parents and trashed = false`;
+
+    do {
+      let url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+        q
+      )}&fields=nextPageToken,files(id,name,webViewLink,webContentLink,mimeType)&pageSize=1000&_t=${Date.now()}`;
+      if (pageToken) {
+        url += `&pageToken=${pageToken}`;
       }
+
+      const driveRes = await fetch(url, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        cache: "no-store",
+      });
+
+      const driveData = await driveRes.json();
+      if (driveData.files) {
+        allDriveFiles = allDriveFiles.concat(driveData.files);
+      }
+      pageToken = driveData.nextPageToken;
+    } while (pageToken);
+
+    const fbSnap = await firebase.database().ref("files").once("value");
+    const fbFiles = fbSnap.val() || {};
+
+    const fbIdToKeyMap = {};
+    Object.entries(fbFiles).forEach(([key, val]) => {
+      if (val.fileId) fbIdToKeyMap[val.fileId] = key;
     });
 
-    const res = await fetch(CONFIG.SYNC_URL, {
-      method: "POST",
-      body: JSON.stringify({ folderId: CONFIG.FOLDER_ID }),
-    });
-    if (!res.ok) throw new Error("Lỗi Sync");
-
-    const newSnapshot = await firebase.database().ref("files").once("value");
-    const newData = newSnapshot.val() || {};
     const updates = {};
+    const driveFileIds = new Set();
 
-    Object.keys(newData).forEach((key) => {
-      const file = newData[key];
-      const oldMeta = metaMap[file.fileId];
-      if (oldMeta) {
-        let needsUpdate = false;
-        let updateData = {};
-        if ((!file.tag || file.tag === "Khác") && oldMeta.tag) {
-          updateData[`files/${key}/tag`] = oldMeta.tag;
-          needsUpdate = true;
-        }
-        if (oldMeta.isPinned) {
-          updateData[`files/${key}/isPinned`] = true;
-          needsUpdate = true;
-        }
-        if (needsUpdate) Object.assign(updates, updateData);
+    allDriveFiles.forEach((dFile) => {
+      driveFileIds.add(dFile.id);
+      const existingKey = fbIdToKeyMap[dFile.id];
+
+      if (existingKey) {
+        updates[`files/${existingKey}/fileName`] = dFile.name;
+        updates[`files/${existingKey}/viewLink`] = dFile.webViewLink;
+        updates[`files/${existingKey}/downloadLink`] =
+          dFile.webContentLink || dFile.webViewLink;
+      } else {
+        const newKey = firebase.database().ref("files").push().key;
+        updates[`files/${newKey}`] = {
+          fileId: dFile.id,
+          fileName: dFile.name,
+          viewLink: dFile.webViewLink,
+          downloadLink: dFile.webContentLink || dFile.webViewLink,
+          tag: "Khác",
+          isPinned: false,
+        };
       }
     });
 
-    if (Object.keys(updates).length > 0)
+    Object.entries(fbFiles).forEach(([key, val]) => {
+      if (val.fileId && !driveFileIds.has(val.fileId)) {
+        updates[`files/${key}`] = null;
+      }
+    });
+
+    if (Object.keys(updates).length > 0) {
       await firebase.database().ref().update(updates);
+    }
+
     loadFilesFromFirebase();
   } catch (error) {
-    alert("Lỗi: " + error.message);
+    console.error("Lỗi Sync:", error);
+    if (!silent) console.warn("Lỗi đồng bộ: " + error.message);
   } finally {
-    btnSync.innerHTML = originalHTML;
-    btnSync.disabled = false;
+    if (!silent) {
+      btnSync.innerHTML = originalHTML;
+      btnSync.disabled = false;
+    }
   }
 }
 
 function loadFilesFromFirebase() {
   const db = firebase.database();
   const tbody = document.getElementById("file-list");
-  tbody.innerHTML =
-    '<tr><td colspan="3" class="loading-text">Đang tải dữ liệu...</td></tr>';
+
+  if (tbody.innerHTML.trim() === "") {
+    tbody.innerHTML =
+      '<tr><td colspan="3" class="loading-text">Đang tải dữ liệu...</td></tr>';
+  }
+
   db.ref("files")
     .once("value")
     .then((snapshot) => {
@@ -362,7 +436,7 @@ function loadFilesFromFirebase() {
       ALL_FILES_DATA.reverse();
       updateDatalist(ALL_FILES_DATA);
       updateFilters(ALL_FILES_DATA);
-      renderFilesTable();
+      renderFilesTable(document.getElementById("search-input").value);
     });
 }
 
@@ -391,16 +465,28 @@ function updateDatalist(files) {
 function updateFilters(files) {
   const tagContainer = document.getElementById("tag-filter-list");
   const tags = getUniqueTags(files);
-  tagContainer.innerHTML = `<label class="filter-item"><input type="checkbox" value="ALL" class="tag-cb" checked> Tất cả</label>`;
+
+  let tagHTML = `<label class="filter-item"><input type="checkbox" value="ALL" class="tag-cb" ${
+    ACTIVE_TAGS.has("ALL") ? "checked" : ""
+  }> Tất cả</label>`;
   tags.forEach((tag) => {
-    tagContainer.innerHTML += `<label class="filter-item"><input type="checkbox" value="${tag}" class="tag-cb"> ${tag}</label>`;
+    const isChecked = ACTIVE_TAGS.has(tag) ? "checked" : "";
+    tagHTML += `<label class="filter-item"><input type="checkbox" value="${tag}" class="tag-cb" ${isChecked}> ${tag}</label>`;
   });
+  tagContainer.innerHTML = tagHTML;
+
   const typeContainer = document.getElementById("type-filter-list");
   const types = new Set(files.map((f) => getFileType(f.fileName).name));
-  typeContainer.innerHTML = `<label class="filter-item"><input type="checkbox" value="ALL" class="type-cb" checked> Tất cả</label>`;
+
+  let typeHTML = `<label class="filter-item"><input type="checkbox" value="ALL" class="type-cb" ${
+    ACTIVE_TYPES.has("ALL") ? "checked" : ""
+  }> Tất cả</label>`;
   types.forEach((type) => {
-    typeContainer.innerHTML += `<label class="filter-item"><input type="checkbox" value="${type}" class="type-cb"> ${type}</label>`;
+    const isChecked = ACTIVE_TYPES.has(type) ? "checked" : "";
+    typeHTML += `<label class="filter-item"><input type="checkbox" value="${type}" class="type-cb" ${isChecked}> ${type}</label>`;
   });
+  typeContainer.innerHTML = typeHTML;
+
   setupFilterEvents();
 }
 
@@ -459,7 +545,6 @@ function getFileType(fileName) {
 
 function renderFilesTable(searchText = "") {
   const tbody = document.getElementById("file-list");
-  tbody.innerHTML = "";
 
   let filtered = ALL_FILES_DATA.filter((file) => {
     const fileType = getFileType(file.fileName).name;
@@ -494,9 +579,10 @@ function renderFilesTable(searchText = "") {
     }
   });
 
+  tbody.innerHTML = "";
   if (filtered.length === 0) {
     tbody.innerHTML =
-      '<tr><td colspan="3" style="text-align:center; padding:20px; color:#999">Không có dữ liệu</td></tr>';
+      '<tr><td colspan="3" style="text-align:center; padding:20px; color:#999">Không có dữ liệu phù hợp</td></tr>';
     return;
   }
 
